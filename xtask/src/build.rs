@@ -7,6 +7,8 @@ use crate::build_ebpf::{build_ebpf, Architecture, Options as BuildOptions};
 
 #[derive(Debug, Parser)]
 pub struct Options {
+    /// Name of the BPF program
+    pub name: String,
     /// Set the endianness of the BPF target
     #[clap(default_value = "bpfel-unknown-none", long)]
     pub bpf_target: Architecture,
@@ -35,6 +37,7 @@ pub fn build(opts: Options) -> Result<(), anyhow::Error> {
     build_ebpf(BuildOptions {
         target: opts.bpf_target,
         release: opts.release,
+        name: format!("{}-ebpf", opts.name),
     })
     .context("Error while building eBPF program")?;
     build_project(&opts).context("Error while building userspace application")?;

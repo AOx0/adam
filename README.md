@@ -7,7 +7,7 @@
 ## Build eBPF
 
 ```bash
-cargo xtask build-ebpf
+cargo xtask build-ebpf <NAME>
 ```
 
 To perform a release build you can use the `--release` flag.
@@ -22,11 +22,11 @@ cargo build
 ## Build eBPF and Userspace
 
 ```bash
-cargo xtask build
+cargo xtask build <NAME>
 ```
 
 ## Run
 
 ```bash
-RUST_LOG=info cargo xtask run
+RUST_LOG=info cargo xtask run <NAME>
 ```
