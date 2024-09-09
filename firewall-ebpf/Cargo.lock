@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "arrayvec"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
+
+[[package]]
 name = "aya-ebpf"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -84,8 +90,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "etherparse"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21696e6dfe1057a166a042c6d27b89a46aad2ee1003e6e1e03c49d54fd3270d7"
+dependencies = [
+ "arrayvec",
+]
+
+[[package]]
 name = "firewall-common"
 version = "0.1.0"
+dependencies = [
+ "netp",
+]
 
 [[package]]
 name = "firewall-ebpf"
@@ -94,6 +112,16 @@ dependencies = [
  "aya-ebpf",
  "aya-log-ebpf",
  "firewall-common",
+ "netp",
+]
+
+[[package]]
+name = "netp"
+version = "0.1.0"
+source = "git+https://github.com/AOx0/netp-1#238ec02ba5b8f5f349872fe3f0d9fc512faace06"
+dependencies = [
+ "aya-ebpf-bindings",
+ "etherparse",
 ]
 
 [[package]]

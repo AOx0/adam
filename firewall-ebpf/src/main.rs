@@ -1,17 +1,28 @@
 #![no_std]
 #![no_main]
 
+use core::net::{Ipv4Addr, SocketAddrV4};
+
 use aya_ebpf::{
     bindings::xdp_action,
     macros::{map, xdp},
-    maps::RingBuf,
+    maps::{Array, RingBuf},
     programs::XdpContext,
 };
-use aya_log_ebpf::error;
-use firewall_common::FirewallEvent;
+use aya_log_ebpf::{error, info};
+use firewall_common::{Direction, FirewallAction, FirewallEvent, FirewallMatch, FirewallRule};
+use netp::{
+    aya::XdpErr,
+    bounds,
+    link::{EtherType, Ethernet},
+    network::IPv4,
+};
 
 #[map]
 static FIREWALL_EVENTS: RingBuf = RingBuf::with_byte_size(4096, 0);
+
+#[map]
+static FIREWALL_RULES: Array<FirewallRule> = Array::with_max_entries(100, 0);
 
 #[xdp]
 pub fn firewall(ctx: XdpContext) -> u32 {
@@ -22,15 +33,91 @@ pub fn firewall(ctx: XdpContext) -> u32 {
 }
 
 fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
+    let packet = unsafe {
+        core::slice::from_raw_parts_mut(ctx.data() as *mut u8, ctx.data_end() - ctx.data())
+    };
+
+    bounds!(ctx, Ethernet::MIN_LEN).or_drop()?;
+    bounds!(ctx, Ethernet::MIN_LEN + IPv4::MIN_LEN).or_drop()?;
+    let (eth, rem) = Ethernet::new(packet).or_pass()?;
+
+    // TODO: Impl this
+    // if let EtherType::IPv6 = eth.ethertype() {}
+
+    if let EtherType::IPv4 = eth.ethertype() {
+        bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
+        let (ip4, rem): (IPv4<&[u8]>, &[u8]) = IPv4::new(rem).or_drop()?;
+
+        // while let Some(rule) = FIREWALL_RULES.get(i) {
+        let rule = FIREWALL_RULES.get(0).ok_or(0).or_pass()?;
+
+        bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
+        let matching_ip = if rule.applies_to == Direction::Source {
+            ip4.source_u32()
+        } else {
+            ip4.destination_u32()
+        };
+
+        if let FirewallMatch::Protocol(p) = rule.matches {
+            bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
+            let protocol = ip4.protocol();
+            info!(&ctx, "{} == {}", u8::from(p), ip4.protocol_u8());
+
+            if protocol == p {
+                if rule.action == FirewallAction::Accept {
+                    emit(ctx, FirewallEvent::Pass);
+                    return Ok(xdp_action::XDP_PASS);
+                } else {
+                    emit(
+                        ctx,
+                        FirewallEvent::Blocked(core::net::SocketAddr::V4(SocketAddrV4::new(
+                            Ipv4Addr::from_bits(matching_ip),
+                            0,
+                        ))),
+                    );
+                    return Ok(xdp_action::XDP_DROP);
+                }
+            }
+        }
+
+        if let FirewallMatch::Match(core::net::IpAddr::V4(addr)) = rule.matches {
+            // info!(&ctx, "Looking for: {:i}", addr.to_bits());
+
+            info!(&ctx, "IP: {:i}", matching_ip);
+
+            if addr.to_bits() == matching_ip {
+                if rule.action == FirewallAction::Accept {
+                    emit(ctx, FirewallEvent::Pass);
+                    return Ok(xdp_action::XDP_PASS);
+                } else {
+                    emit(
+                        ctx,
+                        FirewallEvent::Blocked(core::net::SocketAddr::V4(SocketAddrV4::new(
+                            Ipv4Addr::from_bits(matching_ip),
+                            0,
+                        ))),
+                    );
+                    return Ok(xdp_action::XDP_DROP);
+                }
+            }
+        }
+
+        // i += 1;
+        // }
+    }
+
+    emit(ctx, FirewallEvent::Pass);
+    Ok(xdp_action::XDP_PASS)
+}
+
+fn emit(ctx: XdpContext, event: FirewallEvent) {
     if let Some(mut entry) = FIREWALL_EVENTS.reserve::<FirewallEvent>(0) {
-        unsafe { core::ptr::write_unaligned(entry.as_mut_ptr(), FirewallEvent::Pass) };
+        unsafe { core::ptr::write_unaligned(entry.as_mut_ptr(), event) };
 
         entry.submit(0);
     } else {
         error!(&ctx, "Failed to reserve entry for FirewallEvent")
     }
-
-    Ok(xdp_action::XDP_PASS)
 }
 
 #[panic_handler]

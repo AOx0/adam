@@ -1,12 +1,13 @@
 use std::io::Error;
+use std::net::{IpAddr, Ipv4Addr};
 
 use anyhow::Context;
-use aya::maps::{MapData, RingBuf};
+use aya::maps::{Array, MapData, RingBuf};
 use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use firewall_common::FirewallEvent;
+use firewall_common::{Direction, FirewallAction, FirewallEvent, FirewallMatch, FirewallRule};
 use log::{debug, info, warn};
 use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
 use tokio::{select, signal};
@@ -55,6 +56,22 @@ async fn main() -> Result<(), anyhow::Error> {
     program.attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
 
+    let mut config: Array<&mut MapData, FirewallRule> =
+        Array::try_from(bpf.map_mut("FIREWALL_RULES").unwrap()).unwrap();
+
+    config
+        .set(
+            0,
+            FirewallRule {
+                action: FirewallAction::Drop,
+                // matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+                matches: FirewallMatch::Protocol(netp::network::InetProtocol::ICMP),
+                applies_to: Direction::Source,
+            },
+            0,
+        )
+        .unwrap();
+
     let notify = std::sync::Arc::new(tokio::sync::Notify::new());
 
     let events = RingBuf::try_from(bpf.take_map("FIREWALL_EVENTS").unwrap()).unwrap();
@@ -67,7 +84,11 @@ async fn main() -> Result<(), anyhow::Error> {
             let (_, [item], _) = (unsafe { item.align_to::<FirewallEvent>() }) else {
                 continue;
             };
-            println!("Received: {:?}", item);
+
+            match item {
+                FirewallEvent::Blocked(_) => println!("{:?}", item),
+                FirewallEvent::Pass => {}
+            }
         }
         guard.clear_ready();
     }
