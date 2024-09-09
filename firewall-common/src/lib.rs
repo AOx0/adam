@@ -35,5 +35,15 @@ pub struct FirewallRule {
     pub applies_to: Direction,
 }
 
-#[cfg(feature = "aya")]
+#[cfg(feature = "user")]
 unsafe impl aya::Pod for FirewallRule {}
+
+#[cfg(feature = "bpf")]
+impl From<FirewallAction> for u32 {
+    fn from(value: FirewallAction) -> Self {
+        match value {
+            FirewallAction::Drop => aya_ebpf::bindings::xdp_action::XDP_DROP,
+            FirewallAction::Accept => aya_ebpf::bindings::xdp_action::XDP_PASS,
+        }
+    }
+}

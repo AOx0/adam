@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use core::net::{Ipv4Addr, SocketAddrV4};
+use core::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use aya_ebpf::{
     bindings::xdp_action,
@@ -57,48 +57,20 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
         } else {
             ip4.destination_u32()
         };
+        let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_bits(matching_ip)), 0);
 
         if let FirewallMatch::Protocol(p) = rule.matches {
             bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
             let protocol = ip4.protocol();
-            info!(&ctx, "{} == {}", u8::from(p), ip4.protocol_u8());
 
             if protocol == p {
-                if rule.action == FirewallAction::Accept {
-                    emit(ctx, FirewallEvent::Pass);
-                    return Ok(xdp_action::XDP_PASS);
-                } else {
-                    emit(
-                        ctx,
-                        FirewallEvent::Blocked(core::net::SocketAddr::V4(SocketAddrV4::new(
-                            Ipv4Addr::from_bits(matching_ip),
-                            0,
-                        ))),
-                    );
-                    return Ok(xdp_action::XDP_DROP);
-                }
+                return emit(ctx, rule.action, Some(socket_addr));
             }
         }
 
         if let FirewallMatch::Match(core::net::IpAddr::V4(addr)) = rule.matches {
-            // info!(&ctx, "Looking for: {:i}", addr.to_bits());
-
-            info!(&ctx, "IP: {:i}", matching_ip);
-
             if addr.to_bits() == matching_ip {
-                if rule.action == FirewallAction::Accept {
-                    emit(ctx, FirewallEvent::Pass);
-                    return Ok(xdp_action::XDP_PASS);
-                } else {
-                    emit(
-                        ctx,
-                        FirewallEvent::Blocked(core::net::SocketAddr::V4(SocketAddrV4::new(
-                            Ipv4Addr::from_bits(matching_ip),
-                            0,
-                        ))),
-                    );
-                    return Ok(xdp_action::XDP_DROP);
-                }
+                return emit(ctx, rule.action, Some(socket_addr));
             }
         }
 
@@ -106,18 +78,33 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
         // }
     }
 
-    emit(ctx, FirewallEvent::Pass);
-    Ok(xdp_action::XDP_PASS)
+    emit(ctx, FirewallAction::Accept, None)
 }
 
-fn emit(ctx: XdpContext, event: FirewallEvent) {
+fn emit(ctx: XdpContext, action: FirewallAction, socket: Option<SocketAddr>) -> Result<u32, u32> {
     if let Some(mut entry) = FIREWALL_EVENTS.reserve::<FirewallEvent>(0) {
-        unsafe { core::ptr::write_unaligned(entry.as_mut_ptr(), event) };
+        unsafe {
+            core::ptr::write_unaligned(
+                entry.as_mut_ptr(),
+                match action {
+                    FirewallAction::Accept => FirewallEvent::Pass,
+                    FirewallAction::Drop => {
+                        if let Some(s) = socket {
+                            FirewallEvent::Blocked(s)
+                        } else {
+                            FirewallEvent::Pass
+                        }
+                    }
+                },
+            )
+        };
 
         entry.submit(0);
     } else {
         error!(&ctx, "Failed to reserve entry for FirewallEvent")
     }
+
+    Ok(action.into())
 }
 
 #[panic_handler]

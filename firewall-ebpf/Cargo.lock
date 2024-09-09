@@ -102,6 +102,7 @@ dependencies = [
 name = "firewall-common"
 version = "0.1.0"
 dependencies = [
+ "aya-ebpf",
  "netp",
 ]
 
