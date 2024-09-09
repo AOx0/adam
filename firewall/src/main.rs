@@ -1,10 +1,15 @@
+use std::io::Error;
+
 use anyhow::Context;
+use aya::maps::{MapData, RingBuf};
 use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use log::{info, warn, debug};
-use tokio::signal;
+use firewall_common::FirewallEvent;
+use log::{debug, info, warn};
+use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
+use tokio::{select, signal};
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -50,9 +55,41 @@ async fn main() -> Result<(), anyhow::Error> {
     program.attach(&opt.iface, XdpFlags::default())
         .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
 
+    let notify = std::sync::Arc::new(tokio::sync::Notify::new());
+
+    let events = RingBuf::try_from(bpf.take_map("FIREWALL_EVENTS").unwrap()).unwrap();
+    let mut poll = AsyncFd::new(events).unwrap();
+
+    async fn handle_event<'a>(guard: Result<AsyncFdReadyMutGuard<'a, RingBuf<MapData>>, Error>) {
+        let mut guard = guard.unwrap();
+        let ring_buf = guard.get_inner_mut();
+        while let Some(item) = ring_buf.next() {
+            let (_, [item], _) = (unsafe { item.align_to::<FirewallEvent>() }) else {
+                continue;
+            };
+            println!("Received: {:?}", item);
+        }
+        guard.clear_ready();
+    }
+
+    let handle = tokio::task::spawn({
+        let notify = notify.clone();
+        async move {
+            loop {
+                select! {
+                    guard_res = poll.readable_mut() => handle_event(guard_res).await,
+                    _ = notify.notified() => break,
+                }
+            }
+        }
+    });
+
     info!("Waiting for Ctrl-C...");
     signal::ctrl_c().await?;
     info!("Exiting...");
+
+    notify.notify_one();
+    handle.await.unwrap();
 
     Ok(())
 }
