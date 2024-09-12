@@ -16,8 +16,21 @@ async fn main() {
     bincode::serialize_into(&mut buf, &Message::Start).unwrap();
     stream.write_all(&buf).unwrap();
     println!("Message::Start sent");
+    sleep(Duration::from_secs(2)).await;
 
-    sleep(Duration::from_secs(5)).await;
+    println!("Message::Halt");
+    let mut buf = Vec::new();
+    bincode::serialize_into(&mut buf, &Message::Halt).unwrap();
+    stream.write_all(&buf).unwrap();
+    println!("Message::Halt sent");
+    sleep(Duration::from_secs(2)).await;
+
+    println!("Message::Start");
+    let mut buf = Vec::new();
+    bincode::serialize_into(&mut buf, &Message::Start).unwrap();
+    stream.write_all(&buf).unwrap();
+    println!("Message::Start sent");
+    sleep(Duration::from_secs(2)).await;
 
     println!("Message::Terminate");
     let mut buf = Vec::new();

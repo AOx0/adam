@@ -5,4 +5,5 @@ use serde::{Deserialize, Serialize};
 pub enum Message {
     Terminate = 1,
     Start = 2,
+    Halt = 3,
 }

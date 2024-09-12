@@ -24,6 +24,7 @@ struct Opt {
     iface: String,
 }
 
+#[derive(Debug, Clone, Copy)]
 enum State {
     Loaded,
     Terminated,
@@ -65,6 +66,10 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     let (tx, mut rx) = sync::watch::channel(State::Loaded);
 
+    let program: &mut Xdp = bpf.program_mut("firewall").unwrap().try_into()?;
+
+    program.load()?;
+
     let bpf = Arc::new(Mutex::new(bpf));
     let opt = Arc::new(opt);
 
@@ -73,6 +78,8 @@ async fn main() -> Result<(), anyhow::Error> {
         let mut rx = rx.clone();
         let bpf = Arc::clone(&bpf);
         async move {
+            log::info!("Starting event handler");
+
             loop {
                 rx.changed().await.unwrap();
                 match *rx.borrow_and_update() {
@@ -89,9 +96,11 @@ async fn main() -> Result<(), anyhow::Error> {
                 select! {
                     guard_res = poll.readable_mut() => handle_event(guard_res).await,
                     _ = rx.changed() => {
-                        if let State::Terminated = *rx.borrow_and_update() {
-                            break
+                        let val =  *rx.borrow_and_update();
+                        if let State::Terminated = val {
+                            break;
                         }
+
                     },
                 }
             }
@@ -106,6 +115,7 @@ async fn main() -> Result<(), anyhow::Error> {
             tokio::fs::create_dir_all("/run/adam").await.unwrap();
             let listener = UnixListener::bind("/run/adam/firewall").unwrap();
             let link = Arc::new(Mutex::new(None));
+            log::info!("Starting IPC");
 
             loop {
                 select! {
@@ -166,6 +176,22 @@ async fn handle_stream(
                     Ok(n) => {
                         let msg: Message = message::bincode::deserialize_from(&buf[..n]).unwrap();
                         match msg {
+                            Message::Halt => {
+                                let mut link = link.lock().await;
+                                if link.is_none() {
+                                    log::error!("Program not running");
+                                    continue;
+                                }
+
+                                log::warn!("Got halt");
+                                let mut guard = bpf.lock().await;
+                                let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
+
+                                let val = link.take();
+                                program.detach(val.unwrap()).unwrap();
+                                log::warn!("State::Loaded");
+                                tx.send(State::Loaded).unwrap();
+                            },
                             Message::Terminate => {
                                 let mut link = link.lock().await;
                                 if link.is_none() {
@@ -179,13 +205,19 @@ async fn handle_stream(
 
                                 let val = link.take();
                                 program.detach(val.unwrap()).unwrap();
+                                log::warn!("State::Terminated");
                                 tx.send(State::Terminated).unwrap();
                             },
                             Message::Start => {
+                                let mut link = link.lock().await;
+                                if link.is_some() {
+                                    log::error!("Program already running");
+                                    continue;
+                                }
+
+                                log::info!("Loading bpf program");
                                 let mut guard = bpf.lock().await;
                                 let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
-                                program.load()?;
-                                let mut link = link.lock().await;
                                 *link = Some(program.attach(&opt.iface,XdpFlags::default()).context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?);
 
                                 let mut config: Array<&mut MapData, FirewallRule> =
@@ -204,6 +236,7 @@ async fn handle_stream(
                                     )
                                     .unwrap();
 
+                                log::warn!("State::Started");
                                 tx.send(State::Started).unwrap();
                             },
                         }
