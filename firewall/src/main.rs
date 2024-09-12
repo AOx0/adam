@@ -1,16 +1,19 @@
 use std::io::Error;
-use std::net::{IpAddr, Ipv4Addr};
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use aya::maps::{Array, MapData, RingBuf};
 use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
+use bstr::ByteSlice;
 use clap::Parser;
 use firewall_common::{Direction, FirewallAction, FirewallEvent, FirewallMatch, FirewallRule};
 use log::{debug, info, warn};
 use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
-use tokio::{select, signal};
+use tokio::net::unix::SocketAddr;
+use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::watch::{Receiver, Sender};
+use tokio::{select, signal, sync};
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -72,45 +75,102 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .unwrap();
 
-    let notify = std::sync::Arc::new(tokio::sync::Notify::new());
+    let (tx, mut rx) = sync::watch::channel(false);
 
     let events = RingBuf::try_from(bpf.take_map("FIREWALL_EVENTS").unwrap()).unwrap();
     let mut poll = AsyncFd::new(events).unwrap();
 
-    async fn handle_event<'a>(guard: Result<AsyncFdReadyMutGuard<'a, RingBuf<MapData>>, Error>) {
-        let mut guard = guard.unwrap();
-        let ring_buf = guard.get_inner_mut();
-        while let Some(item) = ring_buf.next() {
-            let (_, [item], _) = (unsafe { item.align_to::<FirewallEvent>() }) else {
-                continue;
-            };
-
-            match item {
-                FirewallEvent::Blocked(_) => println!("{:?}", item),
-                FirewallEvent::Pass => {}
-            }
-        }
-        guard.clear_ready();
-    }
-
+    // Event handling
     let handle = tokio::task::spawn({
-        let notify = notify.clone();
+        let mut rx = rx.clone();
         async move {
             loop {
                 select! {
                     guard_res = poll.readable_mut() => handle_event(guard_res).await,
-                    _ = notify.notified() => break,
+                    _ = rx.changed() => break,
+                }
+            }
+        }
+    });
+
+    // Message handling
+    let handle2 = tokio::task::spawn({
+        let mut rx = rx.clone();
+        let tx = tx.clone();
+        async move {
+            tokio::fs::create_dir_all("/run/adam").await.unwrap();
+            let listener = UnixListener::bind("/run/adam/firewall").unwrap();
+
+            loop {
+                select! {
+                    Ok(socket) = listener.accept() => {
+                        tokio::task::spawn(handle_stream(socket, rx.clone(), tx.clone()));
+                    },
+                    _ = rx.changed() => break,
+                    else => continue,
                 }
             }
         }
     });
 
     info!("Waiting for Ctrl-C...");
-    signal::ctrl_c().await?;
+
+    select! {
+        _ = signal::ctrl_c() => {},
+        _ = rx.changed() => {}
+    }
     info!("Exiting...");
 
-    notify.notify_one();
+    tx.send(true).unwrap();
     handle.await.unwrap();
+    handle2.await.unwrap();
+
+    tokio::fs::remove_dir_all("/run/adam").await.unwrap();
 
     Ok(())
+}
+
+async fn handle_stream(
+    (stream, addr): (UnixStream, SocketAddr),
+    mut rx: Receiver<bool>,
+    tx: Sender<bool>,
+) -> Result<()> {
+    let _ = addr;
+    let mut buf = [0u8; 250];
+
+    loop {
+        select! {
+            Ok(_) = stream.readable() => {
+                match stream.try_read(&mut buf) {
+                    Ok(0) => break Ok(()),
+                    Ok(n) => {
+                        println!("INFO :: Got: {:?}", &buf[..n].trim().as_bstr());
+
+                        if buf[..n].trim().contains_str(b"exit") {
+                            tx.send(true).unwrap();
+                        }
+                    }
+                    Err(err) => println!("ERR :: {err:?}"),
+                }
+            }
+            _ = rx.changed() => break Ok(()),
+            else => break Ok(()),
+        }
+    }
+}
+
+async fn handle_event(guard: Result<AsyncFdReadyMutGuard<'_, RingBuf<MapData>>, Error>) {
+    let mut guard = guard.unwrap();
+    let ring_buf = guard.get_inner_mut();
+    while let Some(item) = ring_buf.next() {
+        let (_, [item], _) = (unsafe { item.align_to::<FirewallEvent>() }) else {
+            continue;
+        };
+
+        match item {
+            FirewallEvent::Blocked(_) => println!("{:?}", item),
+            FirewallEvent::Pass => {}
+        }
+    }
+    guard.clear_ready();
 }

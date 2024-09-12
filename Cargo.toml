@@ -1,6 +1,7 @@
 [workspace]
-members = ["xtask", "firewall", "firewall-common"]
+members = ["xtask", "firewall", "firewall-common", "controller"]
 resolver = "2"
 
 [workspace.dependencies]
 netp = { git = "https://github.com/AOx0/netp-1", version = "0.1.0" }
+bstr = "1.10.0"
