@@ -1,4 +1,6 @@
+use std::any::Any;
 use std::io::Error;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use aya::maps::{Array, MapData, RingBuf};
@@ -9,16 +11,24 @@ use bstr::ByteSlice;
 use clap::Parser;
 use firewall_common::{Direction, FirewallAction, FirewallEvent, FirewallMatch, FirewallRule};
 use log::{debug, info, warn};
+use message::Message;
 use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
 use tokio::net::unix::SocketAddr;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::watch::{Receiver, Sender};
+use tokio::sync::Mutex;
 use tokio::{select, signal, sync};
 
 #[derive(Debug, Parser)]
 struct Opt {
     #[clap(short, long, default_value = "eth0")]
     iface: String,
+}
+
+enum State {
+    Loaded,
+    Terminated,
+    Started,
 }
 
 #[tokio::main]
@@ -75,9 +85,12 @@ async fn main() -> Result<(), anyhow::Error> {
         )
         .unwrap();
 
-    let (tx, mut rx) = sync::watch::channel(false);
+    let (tx, mut rx) = sync::watch::channel(State::Loaded);
 
     let events = RingBuf::try_from(bpf.take_map("FIREWALL_EVENTS").unwrap()).unwrap();
+    let bpf = Arc::new(Mutex::new(bpf));
+    let opt = Arc::new(opt);
+
     let mut poll = AsyncFd::new(events).unwrap();
 
     // Event handling
@@ -104,7 +117,7 @@ async fn main() -> Result<(), anyhow::Error> {
             loop {
                 select! {
                     Ok(socket) = listener.accept() => {
-                        tokio::task::spawn(handle_stream(socket, rx.clone(), tx.clone()));
+                        tokio::task::spawn(handle_stream(socket, rx.clone(), tx.clone(), Arc::clone(&opt), Arc::clone(&bpf)));
                     },
                     _ = rx.changed() => break,
                     else => continue,
@@ -121,7 +134,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
     info!("Exiting...");
 
-    tx.send(true).unwrap();
+    tx.send(State::Terminated).unwrap();
     handle.await.unwrap();
     handle2.await.unwrap();
 
@@ -132,11 +145,13 @@ async fn main() -> Result<(), anyhow::Error> {
 
 async fn handle_stream(
     (stream, addr): (UnixStream, SocketAddr),
-    mut rx: Receiver<bool>,
-    tx: Sender<bool>,
+    mut rx: Receiver<State>,
+    tx: Sender<State>,
+    opt: Arc<Opt>,
+    bpf: Arc<Mutex<Bpf>>,
 ) -> Result<()> {
     let _ = addr;
-    let mut buf = [0u8; 250];
+    let mut buf = [0u8; 1500];
 
     loop {
         select! {
@@ -144,16 +159,30 @@ async fn handle_stream(
                 match stream.try_read(&mut buf) {
                     Ok(0) => break Ok(()),
                     Ok(n) => {
-                        println!("INFO :: Got: {:?}", &buf[..n].trim().as_bstr());
+                        let msg: Message = message::bincode::deserialize_from(&buf[..n]).unwrap();
+                        match msg {
+                            Message::Terminate => tx.send(State::Terminated),
+                            Message::Start => {
+                                let mut guard = bpf.lock().await;
+                                let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
+                                program.load()?;
+                                program.attach(&opt.iface, XdpFlags::default())
+                                    .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
+                                tx.send(State::Started)
+                            },
+                        }.unwrap();
 
-                        if buf[..n].trim().contains_str(b"exit") {
-                            tx.send(true).unwrap();
-                        }
                     }
                     Err(err) => println!("ERR :: {err:?}"),
                 }
             }
-            _ = rx.changed() => break Ok(()),
+            _ = rx.changed() => {
+                let val = rx.borrow_and_update();
+                match *val {
+                    State::Loaded | State::Started => (),
+                    State::Terminated => break Ok(()),
+                }
+            },
             else => break Ok(()),
         }
     }
