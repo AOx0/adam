@@ -1,13 +1,12 @@
-use std::any::Any;
 use std::io::Error;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use aya::maps::{Array, MapData, RingBuf};
+use aya::programs::xdp::XdpLinkId;
 use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
-use bstr::ByteSlice;
 use clap::Parser;
 use firewall_common::{Direction, FirewallAction, FirewallEvent, FirewallMatch, FirewallRule};
 use log::{debug, info, warn};
@@ -64,43 +63,36 @@ async fn main() -> Result<(), anyhow::Error> {
         // This can happen if you remove all log statements from your eBPF program.
         warn!("failed to initialize eBPF logger: {}", e);
     }
-    let program: &mut Xdp = bpf.program_mut("firewall").unwrap().try_into()?;
-    program.load()?;
-    program.attach(&opt.iface, XdpFlags::default())
-        .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
-
-    let mut config: Array<&mut MapData, FirewallRule> =
-        Array::try_from(bpf.map_mut("FIREWALL_RULES").unwrap()).unwrap();
-
-    config
-        .set(
-            0,
-            FirewallRule {
-                action: FirewallAction::Drop,
-                // matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
-                matches: FirewallMatch::Protocol(netp::network::InetProtocol::ICMP),
-                applies_to: Direction::Source,
-            },
-            0,
-        )
-        .unwrap();
-
     let (tx, mut rx) = sync::watch::channel(State::Loaded);
 
-    let events = RingBuf::try_from(bpf.take_map("FIREWALL_EVENTS").unwrap()).unwrap();
     let bpf = Arc::new(Mutex::new(bpf));
     let opt = Arc::new(opt);
-
-    let mut poll = AsyncFd::new(events).unwrap();
 
     // Event handling
     let handle = tokio::task::spawn({
         let mut rx = rx.clone();
+        let bpf = Arc::clone(&bpf);
         async move {
+            loop {
+                rx.changed().await.unwrap();
+                match *rx.borrow_and_update() {
+                    State::Loaded => continue,
+                    State::Terminated => return,
+                    State::Started => break,
+                }
+            }
+
+            let events =
+                RingBuf::try_from(bpf.lock().await.take_map("FIREWALL_EVENTS").unwrap()).unwrap();
+            let mut poll = AsyncFd::new(events).unwrap();
             loop {
                 select! {
                     guard_res = poll.readable_mut() => handle_event(guard_res).await,
-                    _ = rx.changed() => break,
+                    _ = rx.changed() => {
+                        if let State::Terminated = *rx.borrow_and_update() {
+                            break
+                        }
+                    },
                 }
             }
         }
@@ -113,13 +105,18 @@ async fn main() -> Result<(), anyhow::Error> {
         async move {
             tokio::fs::create_dir_all("/run/adam").await.unwrap();
             let listener = UnixListener::bind("/run/adam/firewall").unwrap();
+            let link = Arc::new(Mutex::new(None));
 
             loop {
                 select! {
                     Ok(socket) = listener.accept() => {
-                        tokio::task::spawn(handle_stream(socket, rx.clone(), tx.clone(), Arc::clone(&opt), Arc::clone(&bpf)));
+                        tokio::task::spawn(handle_stream(socket, rx.clone(), tx.clone(), Arc::clone(&opt), Arc::clone(&bpf), Arc::clone(&link)));
                     },
-                    _ = rx.changed() => break,
+                    _ = rx.changed() => {
+                        if let State::Terminated = *rx.borrow_and_update(){
+                            break;
+                        }
+                    },
                     else => continue,
                 }
             }
@@ -128,13 +125,20 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Waiting for Ctrl-C...");
 
-    select! {
-        _ = signal::ctrl_c() => {},
-        _ = rx.changed() => {}
+    loop {
+        select! {
+            _ = signal::ctrl_c() => break,
+            _ = rx.changed() => {
+                if let State::Terminated = *rx.borrow_and_update(){
+                    break;
+                }
+            }
+        }
     }
-    info!("Exiting...");
 
     tx.send(State::Terminated).unwrap();
+    info!("Exiting...");
+
     handle.await.unwrap();
     handle2.await.unwrap();
 
@@ -149,43 +153,76 @@ async fn handle_stream(
     tx: Sender<State>,
     opt: Arc<Opt>,
     bpf: Arc<Mutex<Bpf>>,
+    link: Arc<Mutex<Option<XdpLinkId>>>,
 ) -> Result<()> {
     let _ = addr;
-    let mut buf = [0u8; 1500];
+    let mut buf = [0u8; 4096];
 
     loop {
         select! {
             Ok(_) = stream.readable() => {
                 match stream.try_read(&mut buf) {
-                    Ok(0) => break Ok(()),
+                    Ok(0) => break,
                     Ok(n) => {
                         let msg: Message = message::bincode::deserialize_from(&buf[..n]).unwrap();
                         match msg {
-                            Message::Terminate => tx.send(State::Terminated),
+                            Message::Terminate => {
+                                let mut link = link.lock().await;
+                                if link.is_none() {
+                                    log::error!("Program not running");
+                                    continue;
+                                }
+
+                                log::warn!("Got terminate");
+                                let mut guard = bpf.lock().await;
+                                let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
+
+                                let val = link.take();
+                                program.detach(val.unwrap()).unwrap();
+                                tx.send(State::Terminated).unwrap();
+                            },
                             Message::Start => {
                                 let mut guard = bpf.lock().await;
                                 let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
                                 program.load()?;
-                                program.attach(&opt.iface, XdpFlags::default())
-                                    .context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?;
-                                tx.send(State::Started)
+                                let mut link = link.lock().await;
+                                *link = Some(program.attach(&opt.iface,XdpFlags::default()).context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?);
+
+                                let mut config: Array<&mut MapData, FirewallRule> =
+                                    Array::try_from(guard.map_mut("FIREWALL_RULES").unwrap()).unwrap();
+
+                                config
+                                    .set(
+                                        0,
+                                        FirewallRule {
+                                            action: FirewallAction::Drop,
+                                            // matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+                                            matches: FirewallMatch::Protocol(netp::network::InetProtocol::ICMP),
+                                            applies_to: Direction::Source,
+                                        },
+                                        0,
+                                    )
+                                    .unwrap();
+
+                                tx.send(State::Started).unwrap();
                             },
-                        }.unwrap();
+                        }
 
                     }
+                    Err(err) if err.kind() == tokio::io::ErrorKind::WouldBlock => continue,
                     Err(err) => println!("ERR :: {err:?}"),
                 }
             }
             _ = rx.changed() => {
-                let val = rx.borrow_and_update();
-                match *val {
-                    State::Loaded | State::Started => (),
-                    State::Terminated => break Ok(()),
+                if let State::Terminated = *rx.borrow_and_update(){
+                    break;
                 }
             },
-            else => break Ok(()),
+            else => break,
         }
     }
+
+    Ok(())
 }
 
 async fn handle_event(guard: Result<AsyncFdReadyMutGuard<'_, RingBuf<MapData>>, Error>) {
@@ -197,7 +234,7 @@ async fn handle_event(guard: Result<AsyncFdReadyMutGuard<'_, RingBuf<MapData>>, 
         };
 
         match item {
-            FirewallEvent::Blocked(_) => println!("{:?}", item),
+            FirewallEvent::Blocked(_) => info!("{:?}", item),
             FirewallEvent::Pass => {}
         }
     }

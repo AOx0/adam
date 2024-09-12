@@ -3,6 +3,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum Message {
-    Terminate,
-    Start,
+    Terminate = 1,
+    Start = 2,
 }
