@@ -100,7 +100,6 @@ async fn main() -> Result<(), anyhow::Error> {
                         if let State::Terminated = val {
                             break;
                         }
-
                     },
                 }
             }
