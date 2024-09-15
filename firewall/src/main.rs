@@ -126,7 +126,14 @@ async fn main() -> Result<(), anyhow::Error> {
             loop {
                 select! {
                     Ok(socket) = listener.accept() => {
-                        tokio::task::spawn(handle_stream(socket, rx.clone(), tx.clone(), Arc::clone(&opt), Arc::clone(&bpf), Arc::clone(&link)));
+                        tokio::task::spawn(handle_stream(
+                            socket,
+                            rx.clone(),
+                            tx.clone(),
+                            Arc::clone(&opt),
+                            Arc::clone(&bpf),
+                            Arc::clone(&link)
+                        ));
                     },
                     _ = rx.changed() => {
                         if let State::Terminated = *rx.borrow_and_update(){
