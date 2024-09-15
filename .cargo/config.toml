@@ -2,4 +2,4 @@
 xtask = "run --package xtask --"
 
 [build]
-rustflags = ["-Zthreads=8"]
+rustflags = ["-Zthreads=16"]

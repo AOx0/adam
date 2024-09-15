@@ -1,4 +1,5 @@
 use std::io::Error;
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -80,6 +81,7 @@ async fn main() -> Result<(), anyhow::Error> {
         async move {
             log::info!("Starting event handler");
 
+            log::info!("Waiting for bpf map (program start)");
             loop {
                 rx.changed().await.unwrap();
                 match *rx.borrow_and_update() {
@@ -89,9 +91,12 @@ async fn main() -> Result<(), anyhow::Error> {
                 }
             }
 
+            log::info!("Got bpf map");
             let events =
                 RingBuf::try_from(bpf.lock().await.take_map("FIREWALL_EVENTS").unwrap()).unwrap();
             let mut poll = AsyncFd::new(events).unwrap();
+
+            log::info!("Starting event listener");
             loop {
                 select! {
                     guard_res = poll.readable_mut() => handle_event(guard_res).await,
@@ -111,10 +116,11 @@ async fn main() -> Result<(), anyhow::Error> {
         let mut rx = rx.clone();
         let tx = tx.clone();
         async move {
+            log::info!("Starting IPC");
+
             tokio::fs::create_dir_all("/run/adam").await.unwrap();
             let listener = UnixListener::bind("/run/adam/firewall").unwrap();
             let link = Arc::new(Mutex::new(None));
-            log::info!("Starting IPC");
 
             loop {
                 select! {
@@ -227,8 +233,23 @@ async fn handle_stream(
                                         0,
                                         FirewallRule {
                                             action: FirewallAction::Drop,
-                                            // matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+                                            matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 67))),
+                                            // matches: FirewallMatch::Protocol(netp::network::InetProtocol::ICMP),
+                                            enabled: true,
+                                            applies_to: Direction::Source,
+                                        },
+                                        0,
+                                    )
+                                    .unwrap();
+
+                                config
+                                    .set(
+                                        1,
+                                        FirewallRule {
+                                            action: FirewallAction::Drop,
+                                            // matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 67))),
                                             matches: FirewallMatch::Protocol(netp::network::InetProtocol::ICMP),
+                                            enabled: true,
                                             applies_to: Direction::Source,
                                         },
                                         0,
@@ -266,7 +287,7 @@ async fn handle_event(guard: Result<AsyncFdReadyMutGuard<'_, RingBuf<MapData>>, 
         };
 
         match item {
-            FirewallEvent::Blocked(_) => info!("{:?}", item),
+            FirewallEvent::Blocked(_, _) => info!("{:?}", item),
             FirewallEvent::Pass => {}
         }
     }

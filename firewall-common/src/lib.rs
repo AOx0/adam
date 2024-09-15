@@ -4,7 +4,7 @@ use netp::network::InetProtocol;
 
 #[derive(Debug, Clone, Copy)]
 pub enum FirewallEvent {
-    Blocked(core::net::SocketAddr),
+    Blocked(u32, core::net::SocketAddr),
     Pass,
 }
 
@@ -33,6 +33,7 @@ pub struct FirewallRule {
     pub action: FirewallAction,
     pub matches: FirewallMatch,
     pub applies_to: Direction,
+    pub enabled: bool,
 }
 
 #[cfg(feature = "user")]

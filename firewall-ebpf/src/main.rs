@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use core::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use core::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use aya_ebpf::{
     bindings::xdp_action,
@@ -18,11 +18,13 @@ use netp::{
     network::IPv4,
 };
 
+const MAX_RULES: u32 = 100;
+
 #[map]
 static FIREWALL_EVENTS: RingBuf = RingBuf::with_byte_size(4096, 0);
 
 #[map]
-static FIREWALL_RULES: Array<FirewallRule> = Array::with_max_entries(100, 0);
+static FIREWALL_RULES: Array<FirewallRule> = Array::with_max_entries(MAX_RULES, 0);
 
 #[xdp]
 pub fn firewall(ctx: XdpContext) -> u32 {
@@ -49,39 +51,44 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
         let (ip4, rem): (IPv4<&[u8]>, &[u8]) = IPv4::new(rem).or_drop()?;
 
         // while let Some(rule) = FIREWALL_RULES.get(i) {
-        let rule = FIREWALL_RULES.get(0).ok_or(0).or_pass()?;
+        for i in 0..MAX_RULES {
+            let Some(rule @ FirewallRule { enabled: true, .. }) = FIREWALL_RULES.get(i) else {
+                continue;
+            };
 
-        bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
-        let matching_ip = if rule.applies_to == Direction::Source {
-            ip4.source_u32()
-        } else {
-            ip4.destination_u32()
-        };
-        let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_bits(matching_ip)), 0);
-
-        if let FirewallMatch::Protocol(p) = rule.matches {
             bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
-            let protocol = ip4.protocol();
+            let matching_ip = if rule.applies_to == Direction::Source {
+                ip4.source_u32()
+            } else {
+                ip4.destination_u32()
+            };
+            let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_bits(matching_ip)), 0);
 
-            if protocol == p {
-                return emit(ctx, rule.action, Some(socket_addr));
+            if let FirewallMatch::Protocol(p) = rule.matches {
+                bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
+                let protocol = ip4.protocol();
+
+                if protocol == p {
+                    return emit(ctx, rule.action, Some((i, socket_addr)));
+                }
+            }
+
+            if let FirewallMatch::Match(core::net::IpAddr::V4(addr)) = rule.matches {
+                if addr.to_bits() == matching_ip {
+                    return emit(ctx, rule.action, Some((i, socket_addr)));
+                }
             }
         }
-
-        if let FirewallMatch::Match(core::net::IpAddr::V4(addr)) = rule.matches {
-            if addr.to_bits() == matching_ip {
-                return emit(ctx, rule.action, Some(socket_addr));
-            }
-        }
-
-        // i += 1;
-        // }
     }
 
     emit(ctx, FirewallAction::Accept, None)
 }
 
-fn emit(ctx: XdpContext, action: FirewallAction, socket: Option<SocketAddr>) -> Result<u32, u32> {
+fn emit(
+    ctx: XdpContext,
+    action: FirewallAction,
+    socket: Option<(u32, SocketAddr)>,
+) -> Result<u32, u32> {
     if let Some(mut entry) = FIREWALL_EVENTS.reserve::<FirewallEvent>(0) {
         unsafe {
             core::ptr::write_unaligned(
@@ -89,8 +96,8 @@ fn emit(ctx: XdpContext, action: FirewallAction, socket: Option<SocketAddr>) -> 
                 match action {
                     FirewallAction::Accept => FirewallEvent::Pass,
                     FirewallAction::Drop => {
-                        if let Some(s) = socket {
-                            FirewallEvent::Blocked(s)
+                        if let Some((rule, s)) = socket {
+                            FirewallEvent::Blocked(rule, s)
                         } else {
                             FirewallEvent::Pass
                         }
