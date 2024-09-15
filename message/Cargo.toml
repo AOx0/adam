@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 bincode.workspace = true
 serde.workspace = true
+firewall-common = { path = "../firewall-common", features = ["user"] }

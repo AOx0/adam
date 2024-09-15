@@ -39,6 +39,7 @@ pub struct FirewallRule {
     pub matches: FirewallMatch,
     pub applies_to: Direction,
     pub enabled: bool,
+    pub init: bool,
 }
 
 #[cfg(feature = "user")]

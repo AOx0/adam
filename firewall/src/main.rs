@@ -1,5 +1,6 @@
 use std::io::Error;
 use std::net::{IpAddr, Ipv4Addr};
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -162,10 +163,108 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn handle_message(
+    buf: &[u8],
+    tx: &mut Sender<State>,
+    opt: Arc<Opt>,
+    bpf: Arc<Mutex<Bpf>>,
+    link: Arc<Mutex<Option<XdpLinkId>>>,
+) -> Result<ControlFlow<()>> {
+    let msg: Message = message::bincode::deserialize_from(buf).unwrap();
+    match msg {
+        Message::Firewall(f) => match f {
+            message::Firewall::AddRule(_) => todo!(),
+            message::Firewall::DeleteRule(_) => todo!(),
+            message::Firewall::EnableRule(_) => todo!(),
+            message::Firewall::DisableRule(_) => todo!(),
+        },
+        Message::Halt => {
+            let mut link = link.lock().await;
+            if link.is_none() {
+                log::error!("Program not running");
+                return Ok(ControlFlow::Continue(()));
+            }
+
+            log::warn!("Got halt");
+            let mut guard = bpf.lock().await;
+            let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
+
+            let val = link.take();
+            program.detach(val.unwrap()).unwrap();
+            log::warn!("State::Loaded");
+            tx.send(State::Loaded).unwrap();
+        }
+        Message::Terminate => {
+            let mut link = link.lock().await;
+
+            log::warn!("Got terminate");
+            if let Some(val) = link.take() {
+                let mut guard = bpf.lock().await;
+                let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
+
+                program.detach(val).unwrap();
+            }
+
+            log::warn!("State::Terminated");
+            tx.send(State::Terminated).unwrap();
+        }
+        Message::Start => {
+            let mut link = link.lock().await;
+            if link.is_some() {
+                log::error!("Program already running");
+                return Ok(ControlFlow::Continue(()));
+            }
+
+            log::info!("Loading bpf program");
+            let mut guard = bpf.lock().await;
+            let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
+            *link = Some(program.attach(&opt.iface,XdpFlags::default()).context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?);
+
+            let mut config: Array<&mut MapData, FirewallRule> =
+                Array::try_from(guard.map_mut("FIREWALL_RULES").unwrap()).unwrap();
+
+            config
+                .set(
+                    0,
+                    FirewallRule {
+                        action: FirewallAction::Drop,
+                        matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 67))),
+                        // matches: FirewallMatch::Protocol(netp::network::InetProtocol::ICMP),
+                        enabled: true,
+                        init: true,
+                        applies_to: Direction::Source,
+                    },
+                    0,
+                )
+                .unwrap();
+
+            config
+                .set(
+                    1,
+                    FirewallRule {
+                        action: FirewallAction::Drop,
+                        // matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 67))),
+                        matches: FirewallMatch::Protocol(netp::network::InetProtocol::ICMP),
+                        enabled: true,
+                        init: true,
+                        applies_to: Direction::Source,
+                    },
+                    0,
+                )
+                .unwrap();
+
+            log::warn!("State::Started");
+            tx.send(State::Started).unwrap();
+        }
+    }
+
+    Ok(ControlFlow::Continue(()))
+}
+
 async fn handle_stream(
     (stream, addr): (UnixStream, SocketAddr),
     mut rx: Receiver<State>,
-    tx: Sender<State>,
+    mut tx: Sender<State>,
     opt: Arc<Opt>,
     bpf: Arc<Mutex<Bpf>>,
     link: Arc<Mutex<Option<XdpLinkId>>>,
@@ -178,90 +277,18 @@ async fn handle_stream(
             Ok(_) = stream.readable() => {
                 match stream.try_read(&mut buf) {
                     Ok(0) => break,
-                    Ok(n) => {
-                        let msg: Message = message::bincode::deserialize_from(&buf[..n]).unwrap();
-                        match msg {
-                            Message::Halt => {
-                                let mut link = link.lock().await;
-                                if link.is_none() {
-                                    log::error!("Program not running");
-                                    continue;
-                                }
-
-                                log::warn!("Got halt");
-                                let mut guard = bpf.lock().await;
-                                let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
-
-                                let val = link.take();
-                                program.detach(val.unwrap()).unwrap();
-                                log::warn!("State::Loaded");
-                                tx.send(State::Loaded).unwrap();
-                            },
-                            Message::Terminate => {
-                                let mut link = link.lock().await;
-                                if link.is_none() {
-                                    log::error!("Program not running");
-                                    continue;
-                                }
-
-                                log::warn!("Got terminate");
-                                let mut guard = bpf.lock().await;
-                                let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
-
-                                let val = link.take();
-                                program.detach(val.unwrap()).unwrap();
-                                log::warn!("State::Terminated");
-                                tx.send(State::Terminated).unwrap();
-                            },
-                            Message::Start => {
-                                let mut link = link.lock().await;
-                                if link.is_some() {
-                                    log::error!("Program already running");
-                                    continue;
-                                }
-
-                                log::info!("Loading bpf program");
-                                let mut guard = bpf.lock().await;
-                                let program: &mut Xdp = guard.program_mut("firewall").unwrap().try_into()?;
-                                *link = Some(program.attach(&opt.iface,XdpFlags::default()).context("failed to attach the XDP program with default flags - try changing XdpFlags::default() to XdpFlags::SKB_MODE")?);
-
-                                let mut config: Array<&mut MapData, FirewallRule> =
-                                    Array::try_from(guard.map_mut("FIREWALL_RULES").unwrap()).unwrap();
-
-                                config
-                                    .set(
-                                        0,
-                                        FirewallRule {
-                                            action: FirewallAction::Drop,
-                                            matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 67))),
-                                            // matches: FirewallMatch::Protocol(netp::network::InetProtocol::ICMP),
-                                            enabled: true,
-                                            applies_to: Direction::Source,
-                                        },
-                                        0,
-                                    )
-                                    .unwrap();
-
-                                config
-                                    .set(
-                                        1,
-                                        FirewallRule {
-                                            action: FirewallAction::Drop,
-                                            // matches: FirewallMatch::Match(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 67))),
-                                            matches: FirewallMatch::Protocol(netp::network::InetProtocol::ICMP),
-                                            enabled: true,
-                                            applies_to: Direction::Source,
-                                        },
-                                        0,
-                                    )
-                                    .unwrap();
-
-                                log::warn!("State::Started");
-                                tx.send(State::Started).unwrap();
-                            },
-                        }
-
-                    }
+                    Ok(n) => if matches!(
+                        handle_message(
+                            &buf[..n],
+                            &mut tx,
+                            Arc::clone(&opt),
+                            Arc::clone(&bpf),
+                            Arc::clone(&link)
+                        ).await,
+                        Ok(ControlFlow::Break(()))
+                    ) {
+                        break
+                    },
                     Err(err) if err.kind() == tokio::io::ErrorKind::WouldBlock => continue,
                     Err(err) => println!("ERR :: {err:?}"),
                 }
