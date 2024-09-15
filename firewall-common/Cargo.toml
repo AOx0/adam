@@ -5,13 +5,15 @@ edition = "2021"
 
 [features]
 default = []
-user = ["aya"]
-bpf = ["aya-ebpf"]
+user = ["dep:aya", "dep:serde", "netp/serde"]
+bpf = ["dep:aya-ebpf"]
 
 [dependencies]
 aya = { version = "0.12", optional = true }
 aya-ebpf = { version = "0.1.0", optional = true }
-netp.workspace = true
+netp = { workspace = true }
+serde = { workspace = true, optional = true }
+
 
 [lib]
 path = "src/lib.rs"
