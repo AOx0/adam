@@ -38,7 +38,9 @@ pub struct FirewallRule {
     pub action: FirewallAction,
     pub matches: FirewallMatch,
     pub applies_to: Direction,
+    #[cfg_attr(feature = "user", serde(default))]
     pub enabled: bool,
+    #[cfg_attr(feature = "user", serde(default))]
     pub init: bool,
 }
 
