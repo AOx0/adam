@@ -9,16 +9,16 @@ use aya_ebpf::{
     maps::{Array, RingBuf},
     programs::XdpContext,
 };
-use aya_log_ebpf::{error, info};
-use firewall_common::{Direction, FirewallAction, FirewallEvent, FirewallMatch, FirewallRule};
+use aya_log_ebpf::error;
+use firewall_common::{
+    Direction, FirewallAction, FirewallEvent, FirewallMatch, FirewallRule, MAX_RULES,
+};
 use netp::{
     aya::XdpErr,
     bounds,
     link::{EtherType, Ethernet},
     network::IPv4,
 };
-
-const MAX_RULES: u32 = 100;
 
 #[map]
 static FIREWALL_EVENTS: RingBuf = RingBuf::with_byte_size(4096, 0);
@@ -52,7 +52,14 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
 
         // while let Some(rule) = FIREWALL_RULES.get(i) {
         for i in 0..MAX_RULES {
-            let Some(rule @ FirewallRule { enabled: true, .. }) = FIREWALL_RULES.get(i) else {
+            let Some(
+                rule @ FirewallRule {
+                    init: true,
+                    enabled: true,
+                    ..
+                },
+            ) = FIREWALL_RULES.get(i)
+            else {
                 continue;
             };
 
