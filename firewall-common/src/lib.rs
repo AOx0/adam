@@ -1,5 +1,8 @@
 #![no_std]
 
+pub const MAX_RULES: u32 = 100;
+
+pub use netp;
 use netp::network::InetProtocol;
 
 #[derive(Debug, Clone, Copy)]
