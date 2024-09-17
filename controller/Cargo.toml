@@ -9,4 +9,4 @@ message = { path = "../message" }
 axum = "0.7.5"
 serde_json.workspace = true
 serde.workspace = true
-
+deadpool = "0.12.1"
