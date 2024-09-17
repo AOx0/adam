@@ -1,0 +1,12 @@
+[package]
+name = "controller"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.40.0", features = ["full"] }
+message = { path = "../message" }
+axum = "0.7.5"
+serde_json.workspace = true
+serde.workspace = true
+deadpool = "0.12.1"
