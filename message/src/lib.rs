@@ -16,6 +16,9 @@ pub enum Message {
 pub enum FirewallResponse {
     Id(u32),
     ListFull,
+    Rules(Vec<FirewallRule>),
+    Rule(FirewallRule),
+    DoesNotExist,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -24,4 +27,6 @@ pub enum FirewallRequest {
     DeleteRule(u32),
     EnableRule(u32),
     DisableRule(u32),
+    GetRule(u32),
+    GetRules,
 }
