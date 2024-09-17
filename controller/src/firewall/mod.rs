@@ -1,10 +1,7 @@
 use super::*;
-use axum::{extract::Path, Json};
+use axum::{extract::Path, routing::get, Json};
 use message::{bincode, firewall_common::FirewallRule, FirewallRequest, FirewallResponse, Message};
-use std::{
-    io::{Read, Write},
-    os::unix::net::UnixStream,
-};
+use std::{io::Write, os::unix::net::UnixStream};
 
 #[derive(Debug, Clone)]
 pub struct Manager;
@@ -44,6 +41,8 @@ pub fn router() -> Router<AppState> {
         .route("/delete/:idx", post(delete))
         .route("/enable/:idx", post(enable))
         .route("/disable/:idx", post(disable))
+        .route("/rule/:idx", get(get_rule))
+        .route("/rules", get(get_rules))
 }
 
 #[derive(Debug)]
@@ -62,6 +61,17 @@ pub async fn enable(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
 
 pub async fn disable(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
     s.firewall_pool.get().await.unwrap().disable(idx);
+}
+
+pub async fn get_rule(
+    State(s): State<AppState>,
+    Path((idx,)): Path<(u32,)>,
+) -> Json<Option<FirewallRule>> {
+    Json(s.firewall_pool.get().await.unwrap().get_rule(idx))
+}
+
+pub async fn get_rules(State(s): State<AppState>) -> Json<Vec<FirewallRule>> {
+    Json(s.firewall_pool.get().await.unwrap().get_rules())
 }
 
 pub async fn add(
@@ -88,7 +98,7 @@ pub async fn halt(State(s): State<AppState>) {
 impl Socket {
     pub fn new() -> Self {
         Self {
-            buf: Vec::with_capacity(512),
+            buf: Vec::with_capacity(2048),
             stream: UnixStream::connect("/run/adam/firewall").unwrap(),
         }
     }
@@ -117,6 +127,28 @@ impl Socket {
 
     pub fn add(&mut self, rule: FirewallRule) {
         self.send(Message::Firewall(FirewallRequest::AddRule(rule)))
+    }
+
+    pub fn get_rule(&mut self, idx: u32) -> Option<FirewallRule> {
+        self.send(Message::Firewall(FirewallRequest::GetRule(idx)));
+        let read = self.read();
+        if let FirewallResponse::Rule(rule) = read {
+            Some(rule)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_rules(&mut self) -> Vec<FirewallRule> {
+        self.send(Message::Firewall(FirewallRequest::GetRules));
+
+        match self.read() {
+            FirewallResponse::Rules(rules) => rules,
+            FirewallResponse::DoesNotExist => vec![],
+            FirewallResponse::Id(_) => unreachable!(),
+            FirewallResponse::Rule(_) => unreachable!(),
+            FirewallResponse::ListFull => unreachable!(),
+        }
     }
 
     pub fn start(&mut self) {

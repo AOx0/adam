@@ -11,11 +11,9 @@ use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use firewall_common::{
-    Direction, FirewallAction, FirewallEvent, FirewallMatch, FirewallRule, MAX_RULES,
-};
+use firewall_common::{FirewallEvent, FirewallRule, MAX_RULES};
 use log::{debug, info, warn};
-use message::{FirewallResponse, Message};
+use message::{FirewallRequest, FirewallResponse, Message};
 use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
 use tokio::net::unix::SocketAddr;
 use tokio::net::{UnixListener, UnixStream};
@@ -188,10 +186,11 @@ async fn handle_message(
                 Array::try_from(guard.map_mut("FIREWALL_RULES").unwrap()).unwrap();
 
             match msg {
-                message::FirewallRequest::DisableRule(MAX_RULES..)
-                | message::FirewallRequest::EnableRule(MAX_RULES..)
-                | message::FirewallRequest::DeleteRule(MAX_RULES..) => ControlFlow::Continue(None), // Ignore out of bounds rules
-                message::FirewallRequest::AddRule(mut rule) => {
+                FirewallRequest::DisableRule(MAX_RULES..)
+                | FirewallRequest::EnableRule(MAX_RULES..)
+                | FirewallRequest::DeleteRule(MAX_RULES..)
+                | FirewallRequest::GetRule(MAX_RULES..) => ControlFlow::Continue(None), // Ignore out of bounds rules
+                FirewallRequest::AddRule(mut rule) => {
                     rule.init = true;
                     rule.enabled = true;
 
@@ -206,18 +205,18 @@ async fn handle_message(
                         Some(FirewallResponse::ListFull)
                     })
                 }
-                message::FirewallRequest::DeleteRule(idx @ 0..MAX_RULES) => {
+                FirewallRequest::DeleteRule(idx @ 0..MAX_RULES) => {
                     if let Ok(mut rule @ FirewallRule { init: true, .. }) = config.get(&idx, 0) {
                         rule.init = false;
                         config.set(idx, rule, 0).unwrap();
                     }
                     ControlFlow::Continue(None)
                 }
-                action @ message::FirewallRequest::EnableRule(idx @ 0..MAX_RULES)
-                | action @ message::FirewallRequest::DisableRule(idx @ 0..MAX_RULES) => {
+                action @ FirewallRequest::EnableRule(idx @ 0..MAX_RULES)
+                | action @ FirewallRequest::DisableRule(idx @ 0..MAX_RULES) => {
                     let action = match action {
-                        message::FirewallRequest::EnableRule(_) => true,
-                        message::FirewallRequest::DisableRule(_) => false,
+                        FirewallRequest::EnableRule(_) => true,
+                        FirewallRequest::DisableRule(_) => false,
                         _ => unreachable!("match only branches if enable/disable"),
                     };
 
@@ -228,6 +227,21 @@ async fn handle_message(
                         config.set(idx, rule, 0).unwrap();
                     }
                     ControlFlow::Continue(None)
+                }
+                FirewallRequest::GetRule(idx @ 0..MAX_RULES) => {
+                    if let Ok(rule @ FirewallRule { init: true, .. }) = config.get(&idx, 0) {
+                        return Ok(ControlFlow::Continue(Some(FirewallResponse::Rule(rule))));
+                    }
+
+                    ControlFlow::Continue(Some(FirewallResponse::DoesNotExist))
+                }
+                FirewallRequest::GetRules => {
+                    let rules = config
+                        .iter()
+                        .flatten()
+                        .filter(|r| r.init)
+                        .collect::<Vec<_>>();
+                    ControlFlow::Continue(Some(FirewallResponse::Rules(rules)))
                 }
             }
         }
@@ -261,7 +275,7 @@ async fn handle_message(
 
             log::warn!("State::Terminated");
             tx.send(State::Terminated).unwrap();
-            ControlFlow::Continue(None)
+            ControlFlow::Break(())
         }
         Message::Start => {
             let mut link = link.lock().await;
@@ -291,7 +305,7 @@ async fn handle_stream(
     link: Arc<Mutex<Option<XdpLinkId>>>,
 ) -> Result<()> {
     let _ = addr;
-    let mut buf = [0u8; 512];
+    let mut buf = [0u8; 2048];
 
     loop {
         select! {
@@ -300,21 +314,22 @@ async fn handle_stream(
                     Ok(0) => break,
                     Ok(n) => {
                         let Ok(ControlFlow::Continue(res)) =
-                            (handle_message(
+                            handle_message(
                                 &buf[..n],
                                 &mut tx,
                                 Arc::clone(&opt),
                                 Arc::clone(&bpf),
                                 Arc::clone(&link)
-                            ).await) else {
+                            ).await else {
                             break
                         };
 
                         if let Some(res) = res {
                             stream.writable().await.unwrap();
                             let size = message::bincode::serialized_size(&res).unwrap();
-                            message::bincode::serialize_into(&mut buf[..], &res).unwrap();
-                            stream.try_write(&buf[..size.try_into().unwrap()]).unwrap();
+                            let size: usize = size.try_into().unwrap();
+                            message::bincode::serialize_into(&mut buf[..size], &res).unwrap();
+                            stream.try_write(&buf[..size]).unwrap();
                         }
                     },
                     Err(err) if err.kind() == tokio::io::ErrorKind::WouldBlock => continue,
