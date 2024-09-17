@@ -1,6 +1,10 @@
 use super::*;
-use message::{bincode, Message};
-use std::{io::Write, os::unix::net::UnixStream};
+use axum::{extract::Path, Json};
+use message::{bincode, firewall_common::FirewallRule, FirewallRequest, FirewallResponse, Message};
+use std::{
+    io::{Read, Write},
+    os::unix::net::UnixStream,
+};
 
 #[derive(Debug, Clone)]
 pub struct Manager;
@@ -36,12 +40,37 @@ pub fn router() -> Router<AppState> {
         .route("/start", post(start))
         .route("/stop", post(stop))
         .route("/halt", post(halt))
+        .route("/add", post(add))
+        .route("/delete/:idx", post(delete))
+        .route("/enable/:idx", post(enable))
+        .route("/disable/:idx", post(disable))
 }
 
 #[derive(Debug)]
 pub struct Socket {
     buf: Vec<u8>,
     stream: UnixStream,
+}
+
+pub async fn delete(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
+    s.firewall_pool.get().await.unwrap().delete(idx);
+}
+
+pub async fn enable(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
+    s.firewall_pool.get().await.unwrap().enable(idx);
+}
+
+pub async fn disable(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
+    s.firewall_pool.get().await.unwrap().disable(idx);
+}
+
+pub async fn add(
+    State(s): State<AppState>,
+    Json(rule): Json<FirewallRule>,
+) -> Json<FirewallResponse> {
+    let mut socket = s.firewall_pool.get().await.unwrap();
+    socket.add(rule);
+    Json(socket.read())
 }
 
 pub async fn start(State(s): State<AppState>) {
@@ -64,21 +93,41 @@ impl Socket {
         }
     }
 
-    pub fn start(&mut self) {
-        bincode::serialize_into(&mut self.buf, &Message::Start).unwrap();
+    pub fn send(&mut self, msg: Message) {
+        bincode::serialize_into(&mut self.buf, &msg).unwrap();
         self.stream.write_all(&self.buf).unwrap();
         self.buf.clear();
+    }
+
+    pub fn read(&mut self) -> FirewallResponse {
+        bincode::deserialize_from(&self.stream).unwrap()
+    }
+
+    pub fn delete(&mut self, idx: u32) {
+        self.send(Message::Firewall(FirewallRequest::DeleteRule(idx)));
+    }
+
+    pub fn enable(&mut self, idx: u32) {
+        self.send(Message::Firewall(FirewallRequest::EnableRule(idx)));
+    }
+
+    pub fn disable(&mut self, idx: u32) {
+        self.send(Message::Firewall(FirewallRequest::DisableRule(idx)));
+    }
+
+    pub fn add(&mut self, rule: FirewallRule) {
+        self.send(Message::Firewall(FirewallRequest::AddRule(rule)))
+    }
+
+    pub fn start(&mut self) {
+        self.send(Message::Start)
     }
 
     pub fn halt(&mut self) {
-        bincode::serialize_into(&mut self.buf, &Message::Halt).unwrap();
-        self.stream.write_all(&self.buf).unwrap();
-        self.buf.clear();
+        self.send(Message::Halt)
     }
 
     pub fn term(&mut self) {
-        bincode::serialize_into(&mut self.buf, &Message::Terminate).unwrap();
-        self.stream.write_all(&self.buf).unwrap();
-        self.buf.clear();
+        self.send(Message::Terminate)
     }
 }
