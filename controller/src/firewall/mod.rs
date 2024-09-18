@@ -1,6 +1,15 @@
 use super::*;
-use axum::{extract::Path, routing::get, Json};
-use message::{bincode, firewall_common::FirewallRule, FirewallRequest, FirewallResponse, Message};
+use axum::{
+    extract::{ws::WebSocket, Path, WebSocketUpgrade},
+    response::Response,
+    routing::get,
+    Json,
+};
+use message::{
+    bincode,
+    firewall_common::{FirewallEvent, FirewallRule},
+    FirewallRequest, FirewallResponse, Message,
+};
 use std::{io::Write, os::unix::net::UnixStream};
 
 #[derive(Debug, Clone)]
@@ -43,12 +52,30 @@ pub fn router() -> Router<AppState> {
         .route("/disable/:idx", post(disable))
         .route("/rule/:idx", get(get_rule))
         .route("/rules", get(get_rules))
+        .route("/events", get(listen_events))
 }
 
 #[derive(Debug)]
 pub struct Socket {
     buf: Vec<u8>,
     stream: UnixStream,
+}
+
+pub async fn event_dispatcher(mut socket: WebSocket) {
+    let mut uds = UnixStream::connect("/run/adam/firewall_events").unwrap();
+    loop {
+        let event: FirewallEvent = bincode::deserialize_from(&mut uds).unwrap();
+        socket
+            .send(axum::extract::ws::Message::Text(
+                serde_json::to_string(&event).unwrap(),
+            ))
+            .await
+            .unwrap();
+    }
+}
+
+pub async fn listen_events(ws: WebSocketUpgrade) -> Response {
+    ws.on_upgrade(event_dispatcher)
 }
 
 pub async fn delete(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
