@@ -40,44 +40,53 @@ function Page1() {
   const [firewallActive, setFirewallActive] = useState(true); // Estado del firewall
   const [loading, setLoading] = useState(false); // Estado de carga
   const [isExpanded, setIsExpanded] = useState(false); // Estado del expander
+  const [firewallRules, setFirewallRules] = useState([]); // Estado para almacenar las reglas del firewall
+  const [loadingRules, setLoadingRules] = useState(false); // Estado para controlar la carga de las reglas
 
-  // Lista de eventos simulados
-  const events = [
-    { id: 1, name: 'Firewall Enabled', description: 'The firewall was enabled on 2024-09-17 at 10:00 AM' },
-    { id: 2, name: 'Firewall Disabled', description: 'The firewall was disabled on 2024-09-16 at 5:00 PM' },
-    { id: 3, name: 'Intrusion Detected', description: 'An intrusion attempt was detected on 2024-09-15 at 2:00 AM' }
-  ];
-
-  // Función para alternar el estado del expander
-  const toggleExpand = () => {
+  // Función para alternar el estado del expander y obtener las reglas si se expande
+  const toggleExpand = async () => {
     setIsExpanded(!isExpanded);
+
+    if (!isExpanded) { // Solo hace la solicitud si se expande
+      setLoadingRules(true); // Mostrar el estado de carga para las reglas
+      try {
+        const response = await fetch('http://201.121.247.43:80/firewall/rules', {
+          method: 'GET',
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setFirewallRules(data); // Almacenar las reglas obtenidas
+        } else {
+          console.error('Error al obtener las reglas del firewall');
+        }
+      } catch (error) {
+        console.error('Error al realizar la solicitud:', error);
+      } finally {
+        setLoadingRules(false); // Finalizar el estado de carga para las reglas
+      }
+    }
   };
 
-    // Función para hacer la llamada a la API y cambiar el estado del firewall
-    const toggleFirewall = async () => {
-      setLoading(true); // Mostrar el estado de carga
-      
+  // Función para hacer la llamada a la API y cambiar el estado del firewall
+  const toggleFirewall = async () => {
+    setLoading(true); // Mostrar el estado de carga
 
-      const url = firewallActive 
-        ? 'http://201.121.247.43:80/firewall/halt' // Apagar firewall
-        : 'http://201.121.247.43:80/firewall/start'; // Encender firewall
-    
-       console.log(`Sending request to: ${url}`);
+    const url = firewallActive 
+      ? 'http://201.121.247.43:80/firewall/halt' // Apagar firewall
+      : 'http://201.121.247.43:80/firewall/start'; // Encender firewall
 
-       try {
-        // Realiza la solicitud con no-cors
-        await fetch(url, {
-          method: 'POST',
-          mode: 'no-cors', // Añadir el modo no-cors
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-  
-      // Si no hay error, asume que la solicitud fue exitosa
-         console.log('Request sent with no-cors mode.');
-         
-      
+    console.log(`Sending request to: ${url}`);
+
+    try {
+      // Realiza la solicitud con no-cors
+      await fetch(url, {
+        method: 'POST',
+        mode: 'no-cors', // Añadir el modo no-cors
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
       // Cambia el estado del firewall sin depender de la respuesta de la API
       setFirewallActive(!firewallActive); // Cambia el estado de activo a inactivo o viceversa
@@ -88,30 +97,28 @@ function Page1() {
       setLoading(false); // Termina el estado de carga
     }
   };
-    
-
 
   return (
-      <div className="page">
-        <h2>Firewall Monitor</h2>
-  
-        {/* Mostrar el estado del firewall */}
-        <p style={{ color: firewallActive ? 'green' : 'red' }}>
-          Firewall is {firewallActive ? 'active' : 'inactive'}
-        </p>
-  
-        {/* Botón de encendido/apagado */}
-        <button
-          onClick={toggleFirewall}
-          className="toggle-firewall-btn"
-          disabled={loading}
-          style={{ 
-            backgroundColor: firewallActive ? 'red' : 'green', // Cambia el color del botón
-            color: 'white' // Color del texto del botón
-          }}
-        >
-          {loading ? 'Processing...' : firewallActive ? 'Turn Off' : 'Turn On'}
-        </button>
+    <div className="page">
+      <h2>Firewall Monitor</h2>
+
+      {/* Mostrar el estado del firewall */}
+      <p style={{ color: firewallActive ? 'green' : 'red' }}>
+        Firewall is {firewallActive ? 'active' : 'inactive'}
+      </p>
+
+      {/* Botón de encendido/apagado */}
+      <button
+        onClick={toggleFirewall}
+        className="toggle-firewall-btn"
+        disabled={loading}
+        style={{ 
+          backgroundColor: firewallActive ? 'red' : 'green', // Cambia el color del botón
+          color: 'white' // Color del texto del botón
+        }}
+      >
+        {loading ? 'Processing...' : firewallActive ? 'Turn Off' : 'Turn On'}
+      </button>
 
       {/* Botón de mostrar eventos */}
       <div className="expander-section">
@@ -124,7 +131,7 @@ function Page1() {
 
         {/* Mostrar la lista de eventos si el expander está abierto */}
         {isExpanded && (
-          <div className="rule-list">
+          <div className="rules-list">
             <h3>Firewall Rules</h3>
 
             {/* Muestra un indicador de carga mientras se obtienen las reglas */}

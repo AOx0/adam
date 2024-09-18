@@ -147,3 +147,29 @@ button {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Estilos para la tabla de reglas del firewall */
+table {
+  width: 100%;
+  border-collapse: collapse; /* Evita doble borde entre celdas */
+  margin: 20px 0; /* Espaciado superior e inferior de la tabla */
+}
+
+th, td {
+  border: 1px solid #ddd; /* Añade un borde a las celdas */
+  padding: 12px 15px; /* Añade padding para dar más espacio a los datos */
+  text-align: left; /* Alinea el texto a la izquierda */
+}
+
+th {
+  background-color: #f4f4f4; /* Fondo claro para los encabezados */
+  font-weight: bold; /* Hace que los encabezados sean más visibles */
+}
+
+tr:nth-child(even) {
+  background-color: #f9f9f9; /* Color de fondo para filas pares para mejor legibilidad */
+}
+
+tr:hover {
+  background-color: #f1f1f1; /* Fondo diferente cuando el mouse pasa sobre la fila */
+}
