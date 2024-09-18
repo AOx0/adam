@@ -37,12 +37,41 @@ function Home() {
 }
 
 function Page1() {
-  // Estado del firewall
-  const [firewallActive, setFirewallActive] = useState(true);
+  const [firewallActive, setFirewallActive] = useState(true); // Estado del firewall
+  const [loading, setLoading] = useState(false); // Estado de carga
 
-  // Función para cambiar el estado del firewall
-  const toggleFirewall = () => {
-    setFirewallActive(!firewallActive);
+  // Función para hacer la llamada a la API y cambiar el estado del firewall
+  const toggleFirewall = async () => {
+    setLoading(true); // Mostrar el estado de carga
+    try {
+      // TODO: IMPLEMENT API CALL TO TURN API ON
+      const response = await fetch('https://api.example.com/firewall', {
+        method: 'POST', // O 'PUT', dependiendo de la API
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: firewallActive ? 'turn_off' : 'turn_on',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al comunicarse con la API');
+      }
+
+      const result = await response.json();
+
+      // Actualiza el estado solo si la respuesta de la API es correcta
+      if (result.success) {
+        setFirewallActive(!firewallActive); // Cambia el estado del firewall
+      } else {
+        console.error('Error en la respuesta de la API');
+      }
+    } catch (error) {
+      console.error('Error al realizar la solicitud:', error);
+    } finally {
+      setLoading(false); // Termina el estado de carga
+    }
   };
 
   return (
@@ -66,8 +95,9 @@ function Page1() {
           top: '20px',
           right: '20px',
         }}
+        disabled={loading} // Desactivar el botón mientras está en proceso
       >
-        {firewallActive ? 'Turn Off' : 'Turn On'}
+        {loading ? 'Processing...' : firewallActive ? 'Turn Off' : 'Turn On'}
       </button>
       <Link to="/">Back to Home</Link>
     </div>
