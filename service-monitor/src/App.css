@@ -1,3 +1,4 @@
+/* Reseteo básico */
 * {
   margin: 0;
   padding: 0;
@@ -8,6 +9,11 @@ html, body, #root {
   height: 100%;
 }
 
+body {
+  font-family: Arial, sans-serif;
+}
+
+/* Contenedor principal de la App */
 .App {
   height: 100vh;
   width: 100vw;
@@ -15,6 +21,7 @@ html, body, #root {
   flex-direction: column;
 }
 
+/* Estilo para la barra de navegación */
 .App-navbar {
   background-color: #20232a;
   color: white;
@@ -24,6 +31,7 @@ html, body, #root {
   font-weight: bold;
 }
 
+/* Contenedor del encabezado */
 .App-header {
   flex-grow: 1;
   display: flex;
@@ -31,6 +39,7 @@ html, body, #root {
   align-items: center;
 }
 
+/* Contenedor grid */
 .grid-container {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -39,6 +48,7 @@ html, body, #root {
   width: 100%;
 }
 
+/* Elementos del grid */
 .grid-item {
   display: flex;
   justify-content: center;
@@ -55,11 +65,13 @@ html, body, #root {
   background-color: #4fa4d3;
 }
 
+/* Página general */
 .page {
   padding: 20px;
   text-align: center;
 }
 
+/* Título */
 h2 {
   font-size: 2.5rem;
   color: #61dafb;
@@ -71,100 +83,42 @@ h2 {
   font-size: 1.2rem;
 }
 
+/* Botones generales */
 button {
   color: white;
   padding: 10px 20px;
   border: none;
   border-radius: 5px;
   cursor: pointer;
-  position: absolute;
-  top: 20px;
-  right: 20px;
 }
 
-.expander button {
-  background-color: #61dafb;
-  color: white;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-  padding: 15px;
-  font-size: 1.2rem;
-}
-
-.expander button:hover {
-  background-color: #4fa4d3;
-}
-
-.event-list {
-  padding: 10px;
-  background-color: #f1f1f1;
-  margin-top: 10px;
-}
-
-.event-list h3 {
-  margin-bottom: 10px;
-}
-
-.event-list ul {
-  list-style-type: none;
-  padding: 0;
-}
-
-.event-list li {
-  margin-bottom: 10px;
-}
-
-.toggle-firewall-btn {
-  background-color: red;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-top: 20px;
-}
-
-.toggle-firewall-btn.green {
-  background-color: green;
-}
-
-.toggle-firewall-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Añade este bloque al archivo App.css */
-
-.page {
-  padding: 20px;
-  text-align: center;
-}
-
+/* Botón para el expander */
 .expander-section {
-  margin: 20px 0;
+  margin-top: 30px;
+  text-align: center;
 }
 
 .expander-btn {
   padding: 10px 20px;
-  font-size: 1.1rem;
-  background-color: #61dafb;
-  color: white;
-  border: none;
+  font-size: 16px;
+  background-color: #007bff;
   border-radius: 5px;
-  cursor: pointer;
-  margin-bottom: 20px;
 }
 
 .expander-btn:hover {
-  background-color: #4fa4d3;
+  background-color: #47ce04;
 }
 
+/* Lista de eventos */
 .event-list {
-  padding: 10px;
+  margin-top: 20px;
   background-color: #f1f1f1;
-  margin-top: 10px;
+  padding: 20px;
+  text-align: left;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 5px;
 }
 
 .event-list h3 {
@@ -173,20 +127,15 @@ button {
 
 .event-list ul {
   list-style-type: none;
-  padding: 0;
 }
 
 .event-list li {
   margin-bottom: 10px;
 }
 
+/* Botón para encender/apagar el firewall */
 .toggle-firewall-btn {
   background-color: red;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
   margin-top: 20px;
 }
 
