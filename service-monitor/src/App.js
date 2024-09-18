@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
 import './App.css';
 
@@ -37,10 +37,38 @@ function Home() {
 }
 
 function Page1() {
+  // Estado del firewall
+  const [firewallActive, setFirewallActive] = useState(true);
+
+  // Función para cambiar el estado del firewall
+  const toggleFirewall = () => {
+    setFirewallActive(!firewallActive);
+  };
+
   return (
     <div className="page">
-      <h2>Firewall</h2>
-      <p>Firewall Desc</p>
+      <h2>Firewall Monitor</h2>
+      {/* Mostrar el estado del firewall */}
+      <p style={{ color: firewallActive ? 'green' : 'red' }}>
+        Firewall is {firewallActive ? 'active' : 'inactive'}
+      </p>
+      {/* Botón de encendido/apagado */}
+      <button
+        onClick={toggleFirewall}
+        style={{
+          backgroundColor: firewallActive ? 'red' : 'green',
+          color: 'white',
+          padding: '10px 20px',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer',
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+        }}
+      >
+        {firewallActive ? 'Turn Off' : 'Turn On'}
+      </button>
       <Link to="/">Back to Home</Link>
     </div>
   );
