@@ -119,20 +119,41 @@ function Page1() {
           onClick={toggleExpand}
           className="expander-btn"
         >
-          {isExpanded ? 'Hide Events' : 'Show Events'}
+          {isExpanded ? 'Hide Rules' : 'Show Rules'}
         </button>
 
         {/* Mostrar la lista de eventos si el expander está abierto */}
         {isExpanded && (
-          <div className="event-list">
-            <h3>Event List</h3>
-            <ul>
-              {events.map((event) => (
-                <li key={event.id}>
-                  <strong>{event.name}:</strong> {event.description}
-                </li>
-              ))}
-            </ul>
+          <div className="rule-list">
+            <h3>Firewall Rules</h3>
+
+            {/* Muestra un indicador de carga mientras se obtienen las reglas */}
+            {loadingRules ? (
+              <p>Loading rules...</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Action</th>
+                    <th>Protocol</th>
+                    <th>Applies To</th>
+                    <th>Enabled</th>
+                    <th>Init</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {firewallRules.map((rule, index) => (
+                    <tr key={index}>
+                      <td>{rule.action}</td>
+                      <td>{rule.matches.Protocol}</td>
+                      <td>{rule.applies_to}</td>
+                      <td>{rule.enabled ? 'Yes' : 'No'}</td>
+                      <td>{rule.init ? 'Yes' : 'No'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
       </div>
@@ -144,4 +165,3 @@ function Page1() {
 }
 
 export default App;
-
