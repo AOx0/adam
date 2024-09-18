@@ -39,14 +39,26 @@ function Home() {
 function Page1() {
   const [firewallActive, setFirewallActive] = useState(true); // Estado del firewall
   const [loading, setLoading] = useState(false); // Estado de carga
+  const [isExpanded, setIsExpanded] = useState(false); // Estado del expander
+
+  // Lista de eventos simulados
+  const events = [
+    { id: 1, name: 'Firewall Enabled', description: 'The firewall was enabled on 2024-09-17 at 10:00 AM' },
+    { id: 2, name: 'Firewall Disabled', description: 'The firewall was disabled on 2024-09-16 at 5:00 PM' },
+    { id: 3, name: 'Intrusion Detected', description: 'An intrusion attempt was detected on 2024-09-15 at 2:00 AM' }
+  ];
+
+  // Función para alternar el estado del expander
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+  };
 
   // Función para hacer la llamada a la API y cambiar el estado del firewall
   const toggleFirewall = async () => {
     setLoading(true); // Mostrar el estado de carga
     try {
-      // TODO: IMPLEMENT API CALL TO TURN API ON
       const response = await fetch('https://api.example.com/firewall', {
-        method: 'POST', // O 'PUT', dependiendo de la API
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -77,29 +89,47 @@ function Page1() {
   return (
     <div className="page">
       <h2>Firewall Monitor</h2>
+
       {/* Mostrar el estado del firewall */}
       <p style={{ color: firewallActive ? 'green' : 'red' }}>
         Firewall is {firewallActive ? 'active' : 'inactive'}
       </p>
+
       {/* Botón de encendido/apagado */}
       <button
         onClick={toggleFirewall}
-        style={{
-          backgroundColor: firewallActive ? 'red' : 'green',
-          color: 'white',
-          padding: '10px 20px',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
-          position: 'absolute',
-          top: '20px',
-          right: '20px',
-        }}
-        disabled={loading} // Desactivar el botón mientras está en proceso
+        className="toggle-firewall-btn"
+        disabled={loading}
       >
         {loading ? 'Processing...' : firewallActive ? 'Turn Off' : 'Turn On'}
       </button>
-      <Link to="/">Back to Home</Link>
+
+      {/* Botón de mostrar eventos */}
+      <div className="expander-section">
+        <button
+          onClick={toggleExpand}
+          className="expander-btn"
+        >
+          {isExpanded ? 'Hide Events' : 'Show Events'}
+        </button>
+
+        {/* Mostrar la lista de eventos si el expander está abierto */}
+        {isExpanded && (
+          <div className="event-list">
+            <h3>Event List</h3>
+            <ul>
+              {events.map((event) => (
+                <li key={event.id}>
+                  <strong>{event.name}:</strong> {event.description}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Link para volver a Home */}
+      <Link to="/" style={{ marginTop: '20px', display: 'block' }}>Back to Home</Link>
     </div>
   );
 }
