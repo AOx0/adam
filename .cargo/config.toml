@@ -1,5 +1,0 @@
-[alias]
-xtask = "run --package xtask --"
-
-[build]
-rustflags = ["-Zthreads=16"]
