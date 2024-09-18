@@ -53,56 +53,65 @@ function Page1() {
     setIsExpanded(!isExpanded);
   };
 
-  // Función para hacer la llamada a la API y cambiar el estado del firewall
-  const toggleFirewall = async () => {
-    setLoading(true); // Mostrar el estado de carga
-    try {
-      const response = await fetch('https://api.example.com/firewall', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: firewallActive ? 'turn_off' : 'turn_on',
-        }),
-      });
+    // Función para hacer la llamada a la API y cambiar el estado del firewall
+    const toggleFirewall = async () => {
+      setLoading(true); // Mostrar el estado de carga
+      
 
-      if (!response.ok) {
-        throw new Error('Error al comunicarse con la API');
-      }
+      const url = firewallActive 
+        ? 'http://201.121.247.43:80/firewall/halt' // Apagar firewall
+        : 'http://201.121.247.43:80/firewall/start'; // Encender firewall
+    
+       console.log(`Sending request to: ${url}`);
 
-      const result = await response.json();
+       try {
+        // Realiza la solicitud con no-cors
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors', // Añadir el modo no-cors
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+  
+      // Si no hay error, asume que la solicitud fue exitosa
+         console.log('Request sent with no-cors mode.');
+         
+      
 
-      // Actualiza el estado solo si la respuesta de la API es correcta
-      if (result.success) {
-        setFirewallActive(!firewallActive); // Cambia el estado del firewall
-      } else {
-        console.error('Error en la respuesta de la API');
-      }
+      // Cambia el estado del firewall sin depender de la respuesta de la API
+      setFirewallActive(!firewallActive); // Cambia el estado de activo a inactivo o viceversa
+      console.log(`Firewall is now ${!firewallActive ? 'active' : 'inactive'}`);
     } catch (error) {
       console.error('Error al realizar la solicitud:', error);
     } finally {
       setLoading(false); // Termina el estado de carga
     }
   };
+    
+
 
   return (
-    <div className="page">
-      <h2>Firewall Monitor</h2>
-
-      {/* Mostrar el estado del firewall */}
-      <p style={{ color: firewallActive ? 'green' : 'red' }}>
-        Firewall is {firewallActive ? 'active' : 'inactive'}
-      </p>
-
-      {/* Botón de encendido/apagado */}
-      <button
-        onClick={toggleFirewall}
-        className="toggle-firewall-btn"
-        disabled={loading}
-      >
-        {loading ? 'Processing...' : firewallActive ? 'Turn Off' : 'Turn On'}
-      </button>
+      <div className="page">
+        <h2>Firewall Monitor</h2>
+  
+        {/* Mostrar el estado del firewall */}
+        <p style={{ color: firewallActive ? 'green' : 'red' }}>
+          Firewall is {firewallActive ? 'active' : 'inactive'}
+        </p>
+  
+        {/* Botón de encendido/apagado */}
+        <button
+          onClick={toggleFirewall}
+          className="toggle-firewall-btn"
+          disabled={loading}
+          style={{ 
+            backgroundColor: firewallActive ? 'red' : 'green', // Cambia el color del botón
+            color: 'white' // Color del texto del botón
+          }}
+        >
+          {loading ? 'Processing...' : firewallActive ? 'Turn Off' : 'Turn On'}
+        </button>
 
       {/* Botón de mostrar eventos */}
       <div className="expander-section">
