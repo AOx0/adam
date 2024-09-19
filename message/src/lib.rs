@@ -5,6 +5,7 @@ use firewall_common::FirewallRule;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Message {
     Terminate,
@@ -14,6 +15,7 @@ pub enum Message {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallResponse {
     Id(u32),
@@ -24,6 +26,7 @@ pub enum FirewallResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallRequest {
     AddRule(FirewallRule),
