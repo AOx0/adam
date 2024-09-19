@@ -18,7 +18,7 @@ use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
 use tokio::net::unix::SocketAddr;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::watch::{Receiver, Sender};
-use tokio::sync::Mutex;
+use tokio::sync::{broadcast, Mutex};
 use tokio::{select, signal, sync};
 
 #[derive(Debug, Parser)]
@@ -76,10 +76,65 @@ async fn main() -> Result<(), anyhow::Error> {
     let bpf = Arc::new(Mutex::new(bpf));
     let opt = Arc::new(opt);
 
+    tokio::fs::create_dir_all("/run/adam").await.unwrap();
+
+    let (etx, _) = tokio::sync::broadcast::channel(100);
+
+    let event_emitting = tokio::task::spawn({
+        let mut rx = rx.clone();
+        let etx = etx.clone();
+        async move {
+            let listener = UnixListener::bind("/run/adam/firewall_events").unwrap();
+
+            loop {
+                select! {
+                    Ok((s, _addr)) = listener.accept() => {
+                        tokio::task::spawn({
+                            let mut buf = [0; 2048];
+                            let mut erx: broadcast::Receiver<FirewallEvent> = etx.subscribe();
+                            let mut rx = rx.clone();
+                            async move {
+                                loop {
+                                    select! {
+                                        event = erx.recv() => {
+                                            log::info!("Relaying event");
+                                            let event = event.unwrap();
+                                            let size: usize = message::bincode::serialized_size(&event)
+                                                .unwrap()
+                                                .try_into()
+                                                .unwrap();
+                                            message::bincode::serialize_into(&mut buf[..size], &event).unwrap();
+                                            let Ok(_) = s.try_write(&buf[..size]) else {
+                                                break; // End when the stream closes
+                                            };
+                                            buf.fill(0);
+
+                                        }
+                                        _ = rx.changed() => {
+                                            if let State::Terminated = *rx.borrow_and_update(){
+                                                break;
+                                            }
+                                        },
+                                    }
+                                }
+                            }
+                        });
+                    }
+                    _ = rx.changed() => {
+                        if let State::Terminated = *rx.borrow_and_update(){
+                            break;
+                        }
+                    },
+                }
+            }
+        }
+    });
+
     // Event handling
     let handle = tokio::task::spawn({
         let mut rx = rx.clone();
         let bpf = Arc::clone(&bpf);
+        let mut etx = etx.clone();
         async move {
             log::info!("Starting event handler");
 
@@ -101,7 +156,7 @@ async fn main() -> Result<(), anyhow::Error> {
             log::info!("Starting event listener");
             loop {
                 select! {
-                    guard_res = poll.readable_mut() => handle_event(guard_res).await,
+                    guard_res = poll.readable_mut() => handle_event(guard_res, &mut etx).await,
                     _ = rx.changed() => {
                         let val =  *rx.borrow_and_update();
                         if let State::Terminated = val {
@@ -120,7 +175,6 @@ async fn main() -> Result<(), anyhow::Error> {
         async move {
             log::info!("Starting IPC");
 
-            tokio::fs::create_dir_all("/run/adam").await.unwrap();
             let listener = UnixListener::bind("/run/adam/firewall").unwrap();
             let link = Arc::new(Mutex::new(None));
 
@@ -165,6 +219,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     handle.await.unwrap();
     handle2.await.unwrap();
+    event_emitting.await.unwrap();
 
     tokio::fs::remove_dir_all("/run/adam").await.unwrap();
 
@@ -348,7 +403,10 @@ async fn handle_stream(
     Ok(())
 }
 
-async fn handle_event(guard: Result<AsyncFdReadyMutGuard<'_, RingBuf<MapData>>, Error>) {
+async fn handle_event(
+    guard: Result<AsyncFdReadyMutGuard<'_, RingBuf<MapData>>, Error>,
+    etx: &mut broadcast::Sender<FirewallEvent>,
+) {
     let mut guard = guard.unwrap();
     let ring_buf = guard.get_inner_mut();
     while let Some(item) = ring_buf.next() {
@@ -356,10 +414,17 @@ async fn handle_event(guard: Result<AsyncFdReadyMutGuard<'_, RingBuf<MapData>>, 
             continue;
         };
 
-        match item {
-            FirewallEvent::Blocked(_, _) => info!("{:?}", item),
-            FirewallEvent::Pass => {}
+        if let FirewallEvent::Pass = item {
+            continue;
         }
+
+        etx.send(*item).ok(); // We dont care if there are no event listeners
+
+        info!("{:?}", item)
+        // match item {
+        //     FirewallEvent::Blocked(_, _) => info!("{:?}", item),
+        //     FirewallEvent::Pass => {}
+        // }
     }
     guard.clear_ready();
 }
