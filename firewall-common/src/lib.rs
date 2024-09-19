@@ -7,6 +7,7 @@ use netp::network::InetProtocol;
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallEvent {
     Blocked(u32, core::net::SocketAddr),
@@ -15,6 +16,7 @@ pub enum FirewallEvent {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallAction {
     Accept,
@@ -23,6 +25,7 @@ pub enum FirewallAction {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallMatch {
     Match(core::net::IpAddr),
@@ -33,6 +36,7 @@ pub enum FirewallMatch {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Direction {
     Source,
@@ -41,6 +45,7 @@ pub enum Direction {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FirewallRule {
     pub action: FirewallAction,
