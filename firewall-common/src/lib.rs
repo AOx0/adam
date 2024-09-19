@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(feature = "user"), no_std)]
 
 pub const MAX_RULES: u32 = 100;
 
@@ -7,6 +7,7 @@ use netp::network::InetProtocol;
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallEvent {
     Blocked(u32, core::net::SocketAddr),
     Pass,
@@ -14,6 +15,7 @@ pub enum FirewallEvent {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallAction {
     Accept,
     Drop,
@@ -21,6 +23,7 @@ pub enum FirewallAction {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallMatch {
     Match(core::net::IpAddr),
     Socket(core::net::SocketAddr),
@@ -30,6 +33,7 @@ pub enum FirewallMatch {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Direction {
     Source,
     Destination,
@@ -37,6 +41,7 @@ pub enum Direction {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FirewallRule {
     pub action: FirewallAction,
     pub matches: FirewallMatch,

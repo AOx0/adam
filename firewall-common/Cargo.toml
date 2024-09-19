@@ -7,13 +7,14 @@ edition = "2021"
 default = []
 user = ["dep:aya", "dep:serde", "netp/serde"]
 bpf = ["dep:aya-ebpf"]
+schema = ["user", "dep:schemars", "netp/schema"]
 
 [dependencies]
 aya = { version = "0.12", optional = true }
 aya-ebpf = { version = "0.1.0", optional = true }
 netp = { workspace = true }
 serde = { workspace = true, optional = true }
-
+schemars = { workspace = true, optional = true }
 
 [lib]
 path = "src/lib.rs"

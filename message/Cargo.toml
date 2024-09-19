@@ -7,3 +7,9 @@ edition = "2021"
 bincode.workspace = true
 serde.workspace = true
 firewall-common = { path = "../firewall-common", features = ["user"] }
+schemars = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+[features]
+schema = ["dep:schemars", "firewall-common/schema", "dep:serde_json"]
+

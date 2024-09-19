@@ -5,6 +5,7 @@ use firewall_common::FirewallRule;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Message {
     Terminate,
     Start,
@@ -13,6 +14,7 @@ pub enum Message {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallResponse {
     Id(u32),
     ListFull,
@@ -22,6 +24,7 @@ pub enum FirewallResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallRequest {
     AddRule(FirewallRule),
     DeleteRule(u32),
@@ -29,4 +32,18 @@ pub enum FirewallRequest {
     DisableRule(u32),
     GetRule(u32),
     GetRules,
+}
+
+#[cfg(test)]
+#[cfg(feature = "schema")]
+mod test {
+    use super::*;
+
+    #[test]
+    pub fn print_schamas() {
+        use schemars::{schema_for, JsonSchema};
+
+        let schema = schema_for!(FirewallRule);
+        println!("{}", serde_json::to_string_pretty(&schema).unwrap());
+    }
 }
