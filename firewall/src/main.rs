@@ -412,11 +412,17 @@ async fn handle_event(
             continue;
         };
 
-        etx.send(*item).unwrap();
-        match item {
-            FirewallEvent::Blocked(_, _) => info!("{:?}", item),
-            FirewallEvent::Pass => {}
+        if let FirewallEvent::Pass = item {
+            continue;
         }
+
+        etx.send(*item).ok(); // We dont care if there are no event listeners
+
+        info!("{:?}", item)
+        // match item {
+        //     FirewallEvent::Blocked(_, _) => info!("{:?}", item),
+        //     FirewallEvent::Pass => {}
+        // }
     }
     guard.clear_ready();
 }
