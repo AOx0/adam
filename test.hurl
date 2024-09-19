@@ -21,7 +21,7 @@ GET http://localhost/firewall/rule/{{rule-id}}
 HTTP 200
 [Asserts]
 header "Content-Type" == "application/json"
-{"action":"drop","matches":{"protocol":"ICMP"},"applies_to":"source","enabled":true,"init":true}
+{"id":0,"action":"drop","matches":{"protocol":"ICMP"},"applies_to":"source","enabled":false,"init":true}
 
 POST http://localhost/firewall/enable/{{rule-id}}
 HTTP 200
