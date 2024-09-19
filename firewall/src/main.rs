@@ -232,6 +232,7 @@ async fn handle_message(
     opt: Arc<Opt>,
     bpf: Arc<Mutex<Bpf>>,
     link: Arc<Mutex<Option<XdpLinkId>>>,
+    rx: Receiver<State>,
 ) -> Result<ControlFlow<(), Option<FirewallResponse>>> {
     let msg: Message = message::bincode::deserialize_from(buf).unwrap();
     Ok(match msg {
@@ -240,16 +241,16 @@ async fn handle_message(
             let mut config: Array<&mut MapData, FirewallRule> =
                 Array::try_from(guard.map_mut("FIREWALL_RULES").unwrap()).unwrap();
 
-            match msg {
+            ControlFlow::Continue(match msg {
                 FirewallRequest::DisableRule(MAX_RULES..)
                 | FirewallRequest::EnableRule(MAX_RULES..)
                 | FirewallRequest::DeleteRule(MAX_RULES..)
-                | FirewallRequest::GetRule(MAX_RULES..) => ControlFlow::Continue(None), // Ignore out of bounds rules
+                | FirewallRequest::GetRule(MAX_RULES..) => None, // Ignore out of bounds rules
                 FirewallRequest::AddRule(mut rule) => {
                     rule.init = true;
                     rule.enabled = true;
 
-                    ControlFlow::Continue('res: {
+                    'res: {
                         for idx in 0..MAX_RULES {
                             if let Ok(FirewallRule { init: false, .. }) = config.get(&idx, 0) {
                                 config.set(idx, rule, 0).unwrap();
@@ -258,14 +259,14 @@ async fn handle_message(
                         }
 
                         Some(FirewallResponse::ListFull)
-                    })
+                    }
                 }
                 FirewallRequest::DeleteRule(idx @ 0..MAX_RULES) => {
                     if let Ok(mut rule @ FirewallRule { init: true, .. }) = config.get(&idx, 0) {
                         rule.init = false;
                         config.set(idx, rule, 0).unwrap();
                     }
-                    ControlFlow::Continue(None)
+                    None
                 }
                 action @ FirewallRequest::EnableRule(idx @ 0..MAX_RULES)
                 | action @ FirewallRequest::DisableRule(idx @ 0..MAX_RULES) => {
@@ -281,14 +282,14 @@ async fn handle_message(
                         rule.enabled = action;
                         config.set(idx, rule, 0).unwrap();
                     }
-                    ControlFlow::Continue(None)
+                    None
                 }
                 FirewallRequest::GetRule(idx @ 0..MAX_RULES) => {
                     if let Ok(rule @ FirewallRule { init: true, .. }) = config.get(&idx, 0) {
                         return Ok(ControlFlow::Continue(Some(FirewallResponse::Rule(rule))));
                     }
 
-                    ControlFlow::Continue(Some(FirewallResponse::DoesNotExist))
+                    Some(FirewallResponse::DoesNotExist)
                 }
                 FirewallRequest::GetRules => {
                     let rules = config
@@ -296,9 +297,15 @@ async fn handle_message(
                         .flatten()
                         .filter(|r| r.init)
                         .collect::<Vec<_>>();
-                    ControlFlow::Continue(Some(FirewallResponse::Rules(rules)))
+                    Some(FirewallResponse::Rules(rules))
                 }
-            }
+                FirewallRequest::Status => Some(match *rx.borrow() {
+                    State::Loaded | State::Terminated => {
+                        FirewallResponse::Status(message::FirewallStatus::Stopped)
+                    }
+                    State::Started => FirewallResponse::Status(message::FirewallStatus::Running),
+                }),
+            })
         }
         Message::Halt => {
             let mut link = link.lock().await;
@@ -374,7 +381,8 @@ async fn handle_stream(
                                 &mut tx,
                                 Arc::clone(&opt),
                                 Arc::clone(&bpf),
-                                Arc::clone(&link)
+                                Arc::clone(&link),
+                                rx.clone()
                             ).await else {
                             break
                         };

@@ -23,6 +23,15 @@ pub enum FirewallResponse {
     Rules(Vec<FirewallRule>),
     Rule(FirewallRule),
     DoesNotExist,
+    Status(FirewallStatus),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum FirewallStatus {
+    Stopped,
+    Running,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,6 +44,7 @@ pub enum FirewallRequest {
     DisableRule(u32),
     GetRule(u32),
     GetRules,
+    Status,
 }
 
 #[cfg(test)]

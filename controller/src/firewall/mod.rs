@@ -8,7 +8,7 @@ use axum::{
 use message::{
     bincode,
     firewall_common::{FirewallEvent, FirewallRule},
-    FirewallRequest, FirewallResponse, Message,
+    FirewallRequest, FirewallResponse, FirewallStatus, Message,
 };
 use std::{io::Write, os::unix::net::UnixStream};
 
@@ -53,12 +53,17 @@ pub fn router() -> Router<AppState> {
         .route("/rule/:idx", get(get_rule))
         .route("/rules", get(get_rules))
         .route("/events", get(listen_events))
+        .route("/status", get(status))
 }
 
 #[derive(Debug)]
 pub struct Socket {
     buf: Vec<u8>,
     stream: UnixStream,
+}
+
+pub async fn status(State(state): State<AppState>) -> Json<FirewallStatus> {
+    Json(state.firewall_pool.get().await.unwrap().status())
 }
 
 pub async fn event_dispatcher(mut socket: WebSocket) {
@@ -162,6 +167,16 @@ impl Socket {
         self.send(Message::Firewall(FirewallRequest::AddRule(rule)))
     }
 
+    pub fn status(&mut self) -> FirewallStatus {
+        self.send(Message::Firewall(FirewallRequest::Status));
+        let read = self.read();
+        let FirewallResponse::Status(status) = read else {
+            unreachable!("It should always");
+        };
+
+        status
+    }
+
     pub fn get_rule(&mut self, idx: u32) -> Option<FirewallRule> {
         self.send(Message::Firewall(FirewallRequest::GetRule(idx)));
         let read = self.read();
@@ -181,6 +196,7 @@ impl Socket {
             FirewallResponse::Id(_) => unreachable!(),
             FirewallResponse::Rule(_) => unreachable!(),
             FirewallResponse::ListFull => unreachable!(),
+            FirewallResponse::Status(_) => unreachable!(),
         }
     }
 
