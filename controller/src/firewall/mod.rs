@@ -63,14 +63,20 @@ pub struct Socket {
 
 pub async fn event_dispatcher(mut socket: WebSocket) {
     let mut uds = UnixStream::connect("/run/adam/firewall_events").unwrap();
+
     loop {
-        let event: FirewallEvent = bincode::deserialize_from(&mut uds).unwrap();
-        socket
+        let Ok(event): Result<FirewallEvent, _> = bincode::deserialize_from(&mut uds) else {
+            break; // If it fails it may be that the firewall stopped
+        };
+
+        let Ok(_) = socket
             .send(axum::extract::ws::Message::Text(
                 serde_json::to_string(&event).unwrap(),
             ))
             .await
-            .unwrap();
+        else {
+            break; // We will just drop de connection if it fails
+        };
     }
 }
 
