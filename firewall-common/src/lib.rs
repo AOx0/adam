@@ -48,11 +48,16 @@ pub enum Direction {
 #[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FirewallRule {
+    /// id is set by the firewall controller when adding the new rule
+    #[cfg_attr(feature = "user", serde(default))]
+    pub id: u32,
     pub action: FirewallAction,
     pub matches: FirewallMatch,
     pub applies_to: Direction,
+    /// All rules are disabled by default
     #[cfg_attr(feature = "user", serde(default))]
     pub enabled: bool,
+    /// All added rules are marked as initialized
     #[cfg_attr(feature = "user", serde(default))]
     pub init: bool,
 }

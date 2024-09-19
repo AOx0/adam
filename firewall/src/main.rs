@@ -248,11 +248,12 @@ async fn handle_message(
                 | FirewallRequest::GetRule(MAX_RULES..) => None, // Ignore out of bounds rules
                 FirewallRequest::AddRule(mut rule) => {
                     rule.init = true;
-                    rule.enabled = true;
+                    rule.enabled = false;
 
                     'res: {
                         for idx in 0..MAX_RULES {
                             if let Ok(FirewallRule { init: false, .. }) = config.get(&idx, 0) {
+                                rule.id = idx;
                                 config.set(idx, rule, 0).unwrap();
                                 break 'res Some(FirewallResponse::Id(idx));
                             }
