@@ -104,7 +104,9 @@ async fn main() -> Result<(), anyhow::Error> {
                                                 .try_into()
                                                 .unwrap();
                                             message::bincode::serialize_into(&mut buf[..size], &event).unwrap();
-                                            s.try_write(&buf[..size]).unwrap();
+                                            let Ok(_) = s.try_write(&buf[..size]) else {
+                                                break; // End when the stream closes
+                                            };
                                             buf.fill(0);
 
                                         }
