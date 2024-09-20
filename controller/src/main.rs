@@ -21,12 +21,13 @@ impl AppState {
 }
 
 pub async fn insert_cors(req: Request, next: Next) -> Response {
+    println!("Request: {req:?}");
     let mut response = next.run(req).await;
 
-    // response.headers_mut().insert(
-    //     "Access-Control-Allow-Origin",
-    //     "*".parse().expect("Infallible"),
-    // );
+    response.headers_mut().insert(
+        "Access-Control-Allow-Origin",
+        "*".parse().expect("Infallible"),
+    );
 
     response
 }
