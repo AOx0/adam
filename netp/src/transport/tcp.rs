@@ -1,5 +1,5 @@
-pub struct Tcp<'pkt> {
-    slice: &'pkt [u8],
+pub struct Tcp<P = ()> {
+    slice: P,
     size: TcpSize,
 }
 
@@ -9,12 +9,14 @@ pub enum Error {
     InvalidDataOffset(DataOffsetError),
 }
 
-impl<'pkt> Tcp<'pkt> {
+impl Tcp<()> {
     pub const MIN_LEN: usize = 20;
     pub const MAX_LEN: usize = 60;
+}
 
+impl<'pkt> Tcp<&'pkt [u8]> {
     pub fn new(slice: &'pkt [u8]) -> Result<(Self, &'pkt [u8]), Error> {
-        if slice.len() < Self::MIN_LEN {
+        if slice.len() < Tcp::MIN_LEN {
             return Err(Error::InvalidSize(slice.len()));
         }
 
@@ -31,7 +33,26 @@ impl<'pkt> Tcp<'pkt> {
     }
 }
 
-impl Tcp<'_> {
+impl<'pkt> Tcp<&'pkt mut [u8]> {
+    pub fn new_mut(slice: &'pkt mut [u8]) -> Result<(Self, &'pkt mut [u8]), Error> {
+        if slice.len() < Tcp::MIN_LEN {
+            return Err(Error::InvalidSize(slice.len()));
+        }
+
+        let size =
+            TcpSize::try_from_data_offset_u8(slice[12] >> 4).map_err(Error::InvalidDataOffset)?;
+
+        if slice.len() < size as usize {
+            return Err(Error::InvalidSizeForOffset(slice.len(), size));
+        }
+
+        let (slice, rem) = slice.split_at_mut(size as usize);
+
+        Ok((Self { slice, size }, rem))
+    }
+}
+
+impl<'pkt> Tcp<&'pkt [u8]> {
     pub fn size(&self) -> TcpSize {
         self.size
     }
@@ -77,7 +98,7 @@ impl Tcp<'_> {
     }
 
     pub fn options(&self) -> &[u8] {
-        &self.slice[Self::MIN_LEN..self.size as usize]
+        &self.slice[Tcp::MIN_LEN..self.size as usize]
     }
 
     pub fn cwr(&self) -> bool {
