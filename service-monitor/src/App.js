@@ -195,13 +195,15 @@ function Page1() {
         )}
       </div >
       {/* Mostrar mensajes recibidos del WebSocket */}
-      <div className="websocket-messages" id = "second">
+      <div className="websocket-messages" id="second">
         <h3>WebSocket Messages</h3>
-        <ul>
+        <div className="scrollable-window">
           {webSocketMessages.map((msg, index) => (
-            <li key={index}>{msg}</li>
+            <div key={index} className="message">
+              {msg}
+            </div>
           ))}
-        </ul>
+        </div>
       </div>
       </div>
       {/*
