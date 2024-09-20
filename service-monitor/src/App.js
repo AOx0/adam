@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
 import './App.css';
 
@@ -42,6 +42,8 @@ function Page1() {
   const [isExpanded, setIsExpanded] = useState(false); // Estado del expander
   const [firewallRules, setFirewallRules] = useState([]); // Estado para almacenar las reglas del firewall
   const [loadingRules, setLoadingRules] = useState(false); // Estado para controlar la carga de las reglas
+  const [webSocketMessages, setWebSocketMessages] = useState([]); // Estado para almacenar mensajes WebSocket
+
 
   // Función para alternar el estado del expander y obtener las reglas si se expande
   const toggleExpand = async () => {
@@ -97,6 +99,34 @@ function Page1() {
       setLoading(false); // Termina el estado de carga
     }
   };
+  useEffect(() => {
+    const ws = new WebSocket('ws:/172.29.34.232:80/firewall/events');
+
+    // Abrir la conexión
+    ws.onopen = () => {
+      console.log('Conexión WebSocket establecida');
+      ws.send('Cliente conectado');
+    };
+
+    // Recibir mensajes del WebSocket
+    ws.onmessage = (event) => {
+      console.log('Mensaje recibido desde el servidor:', event.data);
+      setWebSocketMessages((prevMessages) => {
+        const newMessages = [...prevMessages, event.data];
+        return newMessages.slice(-50); // Limitar a los últimos 15 mensajes
+      });
+    };
+
+    // Cerrar la conexión
+    ws.onclose = () => {
+      console.log('Conexión WebSocket cerrada');
+    };
+
+    // Limpiar conexión al desmontar el componente
+    return () => {
+      ws.close();
+    };
+  }, []);
 
   return (
     <div className="page">
@@ -128,10 +158,10 @@ function Page1() {
         >
           {isExpanded ? 'Hide Rules' : 'Show Rules'}
         </button>
-
+        <div id="contenido">
         {/* Mostrar la lista de eventos si el expander está abierto */}
         {isExpanded && (
-          <div className="rules-list">
+          <div className="rules-list" id="first">
             <h3>Firewall Rules</h3>
 
             {/* Muestra un indicador de carga mientras se obtienen las reglas */}
@@ -163,11 +193,24 @@ function Page1() {
             )}
           </div>
         )}
+      </div >
+      {/* Mostrar mensajes recibidos del WebSocket */}
+      <div className="websocket-messages" id = "second">
+        <h3>WebSocket Messages</h3>
+        <ul>
+          {webSocketMessages.map((msg, index) => (
+            <li key={index}>{msg}</li>
+          ))}
+        </ul>
       </div>
-
-      {/* Link para volver a Home */}
+      </div>
+      {/*
+      <div>
       <Link to="/" style={{ marginTop: '20px', display: 'block' }}>Back to Home</Link>
+      </div>
+       Link para volver a Home */}
     </div>
+    
   );
 }
 
