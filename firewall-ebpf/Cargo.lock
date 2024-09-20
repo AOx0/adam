@@ -119,7 +119,6 @@ dependencies = [
 [[package]]
 name = "netp"
 version = "0.1.0"
-source = "git+https://github.com/AOx0/netp-1#238ec02ba5b8f5f349872fe3f0d9fc512faace06"
 dependencies = [
  "aya-ebpf-bindings",
  "etherparse",
