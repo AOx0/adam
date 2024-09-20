@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bincode.workspace = true
+async-bincode.workspace = true
 serde.workspace = true
 firewall-common = { path = "../firewall-common", features = ["user"] }
 schemars = { workspace = true, optional = true }
