@@ -3,7 +3,7 @@ layout {
     // pane split_direction="horizontal" {
     pane split_direction="vertical" {
         pane command="just" {
-            args "run-firewall"
+            args "run-firewall" "wlan0"
         }
         pane command="just" {
             args "run-controller"
