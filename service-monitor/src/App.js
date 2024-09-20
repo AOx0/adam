@@ -50,7 +50,7 @@ function Page1() {
     if (!isExpanded) { // Solo hace la solicitud si se expande
       setLoadingRules(true); // Mostrar el estado de carga para las reglas
       try {
-        const response = await fetch('http://201.121.247.43:80/firewall/rules', {
+        const response = await fetch('http://172.29.34.232:80/firewall/rules', {
           method: 'GET',
         });
 
@@ -73,8 +73,8 @@ function Page1() {
     setLoading(true); // Mostrar el estado de carga
 
     const url = firewallActive 
-      ? 'http://201.121.247.43:80/firewall/halt' // Apagar firewall
-      : 'http://201.121.247.43:80/firewall/start'; // Encender firewall
+      ? 'http:/172.29.34.232:80/firewall/halt' // Apagar firewall
+      : 'http://172.29.34.232:80/firewall/start'; // Encender firewall
 
     console.log(`Sending request to: ${url}`);
 
@@ -141,21 +141,21 @@ function Page1() {
               <table>
                 <thead>
                   <tr>
+                    <th>ID</th>
                     <th>Action</th>
-                    <th>Protocol</th>
+                    <th>Rule</th>
                     <th>Applies To</th>
                     <th>Enabled</th>
-                    <th>Init</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {firewallRules.map((rule, index) => (
-                    <tr key={index}>
+                  {firewallRules.map((rule,number) => (
+                    <tr key={number}>
+                      <td>{rule.id}</td>
                       <td>{rule.action}</td>
-                      <td>{rule.matches.Protocol}</td>
+                      <td>{JSON.stringify(rule.matches)}</td>
                       <td>{rule.applies_to}</td>
                       <td>{rule.enabled ? 'Yes' : 'No'}</td>
-                      <td>{rule.init ? 'Yes' : 'No'}</td>
                     </tr>
                   ))}
                 </tbody>
