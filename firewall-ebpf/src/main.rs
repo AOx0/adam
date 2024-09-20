@@ -48,7 +48,7 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
 
     if let EtherType::IPv4 = eth.ethertype() {
         bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
-        let (ip4, rem): (IPv4<&[u8]>, &[u8]) = IPv4::new(rem).or_drop()?;
+        let (ip4, _rem): (IPv4<&[u8]>, &[u8]) = IPv4::new(rem).or_drop()?;
 
         // while let Some(rule) = FIREWALL_RULES.get(i) {
         for i in 0..MAX_RULES {
@@ -103,8 +103,8 @@ fn emit(
                 match action {
                     FirewallAction::Accept => FirewallEvent::Pass,
                     FirewallAction::Drop => {
-                        if let Some((rule, s)) = socket {
-                            FirewallEvent::Blocked(rule, s)
+                        if let Some((rule, addr)) = socket {
+                            FirewallEvent::Blocked { rule, addr }
                         } else {
                             FirewallEvent::Pass
                         }

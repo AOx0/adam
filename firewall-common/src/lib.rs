@@ -10,8 +10,11 @@ use netp::network::InetProtocol;
 #[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FirewallEvent {
-    Blocked(u32, core::net::SocketAddr),
     Pass,
+    Blocked {
+        rule: u32,
+        addr: core::net::SocketAddr,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
