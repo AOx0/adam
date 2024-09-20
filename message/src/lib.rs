@@ -1,4 +1,4 @@
-pub use bincode;
+pub use async_bincode;
 pub use firewall_common;
 
 use firewall_common::FirewallRule;

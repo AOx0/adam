@@ -13,6 +13,7 @@ use aya_log::BpfLogger;
 use clap::Parser;
 use firewall_common::{FirewallEvent, FirewallRule, MAX_RULES};
 use log::{debug, info, warn};
+use message::async_bincode::tokio::AsyncBincodeStream;
 use message::{FirewallRequest, FirewallResponse, Message};
 use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
 use tokio::net::unix::SocketAddr;
@@ -90,34 +91,10 @@ async fn main() -> Result<(), anyhow::Error> {
                 select! {
                     Ok((s, _addr)) = listener.accept() => {
                         tokio::task::spawn({
-                            let mut buf = [0; 2048];
-                            let mut erx: broadcast::Receiver<FirewallEvent> = etx.subscribe();
-                            let mut rx = rx.clone();
-                            async move {
-                                loop {
-                                    select! {
-                                        event = erx.recv() => {
-                                            log::info!("Relaying event");
-                                            let event = event.unwrap();
-                                            let size: usize = message::bincode::serialized_size(&event)
-                                                .unwrap()
-                                                .try_into()
-                                                .unwrap();
-                                            message::bincode::serialize_into(&mut buf[..size], &event).unwrap();
-                                            let Ok(_) = s.try_write(&buf[..size]) else {
-                                                break; // End when the stream closes
-                                            };
-                                            buf.fill(0);
 
-                                        }
-                                        _ = rx.changed() => {
-                                            if let State::Terminated = *rx.borrow_and_update(){
-                                                break;
-                                            }
-                                        },
-                                    }
-                                }
-                            }
+                            let erx: broadcast::Receiver<FirewallEvent> = etx.subscribe();
+                            let rx = rx.clone();
+                            emit_to_suscriber(rx,erx, s)
                         });
                     }
                     _ = rx.changed() => {
@@ -226,15 +203,46 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+async fn emit_to_suscriber(
+    mut rx: Receiver<State>,
+    mut erx: broadcast::Receiver<FirewallEvent>,
+    s: UnixStream,
+) {
+    use message::async_bincode::tokio::AsyncBincodeWriter;
+
+    let mut s: AsyncBincodeWriter<
+        UnixStream,
+        FirewallEvent,
+        message::async_bincode::AsyncDestination,
+    > = AsyncBincodeWriter::from(s).for_async();
+    loop {
+        select! {
+            Ok(event) = erx.recv() => {
+                log::info!("Relaying event");
+                if futures::SinkExt::send(&mut s, event).await.is_err() {
+                    break;
+                };
+            }
+            _ = rx.changed() => {
+                if let State::Terminated = *rx.borrow_and_update(){
+                    break;
+                }
+            },
+            else => {
+                break;
+            }
+        }
+    }
+}
+
 async fn handle_message(
-    buf: &[u8],
+    msg: Message,
     tx: &mut Sender<State>,
     opt: Arc<Opt>,
     bpf: Arc<Mutex<Bpf>>,
     link: Arc<Mutex<Option<XdpLinkId>>>,
     rx: Receiver<State>,
 ) -> Result<ControlFlow<(), Option<FirewallResponse>>> {
-    let msg: Message = message::bincode::deserialize_from(buf).unwrap();
     Ok(match msg {
         Message::Firewall(msg) => {
             let mut guard = bpf.lock().await;
@@ -360,44 +368,39 @@ async fn handle_message(
 }
 
 async fn handle_stream(
-    (stream, addr): (UnixStream, SocketAddr),
+    (stream, _addr): (UnixStream, SocketAddr),
     mut rx: Receiver<State>,
     mut tx: Sender<State>,
     opt: Arc<Opt>,
     bpf: Arc<Mutex<Bpf>>,
     link: Arc<Mutex<Option<XdpLinkId>>>,
 ) -> Result<()> {
-    let _ = addr;
-    let mut buf = [0u8; 2048];
+    use futures::{SinkExt, StreamExt};
+
+    let mut s: AsyncBincodeStream<
+        UnixStream,
+        Message,
+        FirewallResponse,
+        message::async_bincode::AsyncDestination,
+    > = AsyncBincodeStream::from(stream).for_async();
 
     loop {
         select! {
-            Ok(_) = stream.readable() => {
-                match stream.try_read(&mut buf) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        let Ok(ControlFlow::Continue(res)) =
-                            handle_message(
-                                &buf[..n],
-                                &mut tx,
-                                Arc::clone(&opt),
-                                Arc::clone(&bpf),
-                                Arc::clone(&link),
-                                rx.clone()
-                            ).await else {
-                            break
-                        };
+            Some(msg) = s.next() => {
+                let Ok(ControlFlow::Continue(res)) =
+                    handle_message(
+                        msg.unwrap(),
+                        &mut tx,
+                        Arc::clone(&opt),
+                        Arc::clone(&bpf),
+                        Arc::clone(&link),
+                        rx.clone()
+                    ).await else {
+                    break
+                };
 
-                        if let Some(res) = res {
-                            stream.writable().await.unwrap();
-                            let size = message::bincode::serialized_size(&res).unwrap();
-                            let size: usize = size.try_into().unwrap();
-                            message::bincode::serialize_into(&mut buf[..size], &res).unwrap();
-                            stream.try_write(&buf[..size]).unwrap();
-                        }
-                    },
-                    Err(err) if err.kind() == tokio::io::ErrorKind::WouldBlock => continue,
-                    Err(err) => println!("ERR :: {err:?}"),
+                if let Some(res) = res && s.send(res).await.is_err() {
+                    break;
                 }
             }
             _ = rx.changed() => {

@@ -25,3 +25,6 @@ header "Content-Type" == "application/json"
 
 POST http://localhost/firewall/enable/{{rule-id}}
 HTTP 200
+
+POST http://localhost/firewall/start
+HTTP 200

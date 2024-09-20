@@ -19,6 +19,7 @@ bstr.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 message = { path = "../message" }
+futures.workspace = true
 
 [[bin]]
 name = "firewall"
