@@ -4,7 +4,7 @@ function WebSocketMessages() {
   const [webSocketMessages, setWebSocketMessages] = useState([]);
 
   useEffect(() => {
-    const ws = new WebSocket('ws:/172.29.34.232:80/firewall/events');
+    const ws = new WebSocket('ws:/201.121.247.43:80/firewall/events');
 
     ws.onopen = () => {
       console.log('Conexión WebSocket establecida');
