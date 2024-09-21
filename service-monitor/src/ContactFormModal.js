@@ -14,7 +14,7 @@ function ContactFormModal() {
   return (
     <div>
       <button onClick={() => setIsModalOpen(true)} className="open-modal-btn">
-        Open Form
+      Add Rule
       </button>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
