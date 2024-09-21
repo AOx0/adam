@@ -264,3 +264,26 @@ textarea {
 .submit-btn:hover {
   background-color: #218838;
 }
+
+/* App.css o FirewallRules.css */
+.delete-rule {
+  margin-top: 20px; /* Espaciado superior */
+  padding: 10px; /* Espaciado interno */
+  border: 1px solid #ccc; /* Borde */
+  border-radius: 5px; /* Bordes redondeados */
+  background-color: #f8f8f8; /* Color de fondo */
+}
+
+.delete-btn {
+  background-color: #ff4d4d; /* Color de fondo del botón */
+  color: white; /* Color del texto */
+  border: none; /* Sin borde */
+  border-radius: 5px; /* Bordes redondeados */
+  padding: 10px 15px; /* Espaciado interno */
+  cursor: pointer; /* Cambia el cursor al pasar el mouse */
+  transition: background-color 0.3s; /* Transición suave */
+}
+
+.delete-btn:hover {
+  background-color: #ff1a1a; /* Color de fondo al pasar el mouse */
+}
