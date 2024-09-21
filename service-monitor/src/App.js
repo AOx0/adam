@@ -46,12 +46,28 @@ function Page1() {
   const [firewallRules, setFirewallRules] = useState([]);
   const [loadingRules, setLoadingRules] = useState(false);
 
+  useEffect(() => {
+    const fetchFirewallStatus = async () => {
+      try {
+        const response = await fetch('http://201.121.247.43:80/firewall/status');
+        if (response.ok) {
+          const status = await response.text();
+          setFirewallActive(status.trim() === '"running"');
+        }
+      } catch (error) {
+        console.error('Error al obtener el estado del firewall:', error);
+      }
+    };
+
+    fetchFirewallStatus();
+  }, []);
+
   const toggleExpand = async () => {
     setIsExpanded(!isExpanded);
     if (!isExpanded) {
       setLoadingRules(true);
       try {
-        const response = await fetch('http://172.29.34.232:80/firewall/rules');
+        const response = await fetch('http://201.121.247.43:80/firewall/rules');
         if (response.ok) {
           const data = await response.json();
           setFirewallRules(data);
@@ -67,8 +83,8 @@ function Page1() {
   const toggleFirewall = async () => {
     setLoading(true);
     const url = firewallActive 
-      ? 'http:/172.29.34.232:80/firewall/halt'
-      : 'http://172.29.34.232:80/firewall/start';
+      ? 'http://201.121.247.43:80/firewall/halt'
+      : 'http://201.121.247.43:80/firewall/start';
     try {
       await fetch(url, { method: 'POST', mode: 'no-cors' });
       setFirewallActive(!firewallActive);
