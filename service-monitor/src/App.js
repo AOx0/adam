@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
 import './App.css';
-import ContactFormModal from './ContactFormModal';
+import AddRuleFormModal from './AddRuleFormModal';
 import WebSocketMessages from './WebSocketMessages';
 import FirewallRules from './FirewallRules';
 
@@ -83,13 +83,34 @@ function Page1() {
   const toggleFirewall = async () => {
     setLoading(true);
     const url = firewallActive 
-      ? 'http://201.121.247.43:80/firewall/halt'
-      : 'http://201.121.247.43:80/firewall/start';
+      ? '/firewall/halt'
+      : '/firewall/start';
     try {
-      await fetch(url, { method: 'POST', mode: 'no-cors' });
+      await fetch(url, { method: 'POST'});
       setFirewallActive(!firewallActive);
     } catch (error) {
       console.error('Error al realizar la solicitud:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteRule = async (ruleId) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/firewall/delete/${ruleId}`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        console.log(`Rule ${ruleId} deleted successfully`);
+        // Actualiza la lista de reglas después de eliminar
+        setFirewallRules((prevRules) => prevRules.filter(rule => rule.id !== ruleId));
+      } else {
+        console.error('Error al eliminar la regla:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error al eliminar la regla:', error);
     } finally {
       setLoading(false);
     }
@@ -115,12 +136,13 @@ function Page1() {
         {loading ? 'Processing...' : firewallActive ? 'Turn Off' : 'Turn On'}
       </button>
 
-      <ContactFormModal />
+      <AddRuleFormModal />
       <FirewallRules 
         firewallRules={firewallRules} 
         loadingRules={loadingRules}
         toggleExpand={toggleExpand}
         isExpanded={isExpanded}
+        onDeleteRule={deleteRule} // Pasar la función de eliminación
       />
       <WebSocketMessages />
     </div>
