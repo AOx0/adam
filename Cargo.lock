@@ -908,8 +908,8 @@ dependencies = [
 [[package]]
 name = "netp"
 version = "0.1.0"
-source = "git+https://github.com/AOx0/netp-1#386c78639c62880001b0de9f5ed9484644bbdf43"
 dependencies = [
+ "aya-ebpf-bindings",
  "etherparse",
  "schemars",
  "serde",

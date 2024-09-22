@@ -2,6 +2,10 @@
 
 pub const MAX_RULES: u32 = 100;
 
+pub mod processor {
+    pub const IPV4_TCP: u32 = 0;
+}
+
 pub use netp;
 use netp::network::InetProtocol;
 

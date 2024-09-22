@@ -1,0 +1,17 @@
+[package]
+name = "netp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+aya-ebpf-bindings = { version = "0.1.0", optional = true }
+etherparse = { version = "0.15.0", default-features = false }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = []
+aya = ["dep:aya-ebpf-bindings"]
+serde = ["dep:serde"]
+schemars = ["dep:schemars"]
+schema = ["serde", "dep:schemars"]
