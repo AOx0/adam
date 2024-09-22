@@ -13,6 +13,13 @@ macro_rules! bounds {
     };
 }
 
+#[macro_export]
+macro_rules! bbounds {
+    ($ctx:expr, $size:expr) => {
+        !($ctx.data() + $size > $ctx.data_end())
+    };
+}
+
 #[inline(always)]
 pub fn csum_fold_helper(mut csum: u64) -> u16 {
     for _i in 0..4 {
