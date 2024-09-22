@@ -17,7 +17,7 @@ pub enum EtherType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[repr(usize)]
+#[repr(u8)]
 pub enum EtherSize {
     S18 = 18,
     S16 = 16,
