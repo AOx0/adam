@@ -11,7 +11,7 @@ use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
-use firewall_common::{FirewallEvent, FirewallRule, MAX_RULES};
+use firewall_common::{processor, FirewallEvent, FirewallRule, MAX_RULES};
 use log::{debug, info, warn};
 use message::async_bincode::tokio::AsyncBincodeStream;
 use message::{FirewallRequest, FirewallResponse, Message};
@@ -68,18 +68,36 @@ async fn main() -> Result<(), anyhow::Error> {
         // This can happen if you remove all log statements from your eBPF program.
         warn!("failed to initialize eBPF logger: {}", e);
     }
+
     let (tx, mut rx) = sync::watch::channel(State::Loaded);
+    let (etx, _) = tokio::sync::broadcast::channel(100);
 
-    let program: &mut Xdp = bpf.program_mut("firewall").unwrap().try_into()?;
+    let mut programs =
+        aya::maps::ProgramArray::try_from(bpf.take_map("PROCESSOR").unwrap()).unwrap();
 
-    program.load()?;
+    macro_rules! register {
+        ($name:expr) => {{
+            let program0: &mut Xdp = bpf.program_mut($name).unwrap().try_into().unwrap();
+            program0.load()?;
+            // program0
+        }};
+        ($at:expr, $name:expr) => {{
+            register!($name);
+            let prog: &Xdp = bpf.program($name).unwrap().try_into().unwrap();
+
+            programs
+                .set(processor::IPV4_TCP, prog.fd().unwrap(), 0)
+                .unwrap();
+        }};
+    }
+
+    register!("firewall");
+    register!(programs::IPV4_TCP, "ipv4_tcp");
 
     let bpf = Arc::new(Mutex::new(bpf));
     let opt = Arc::new(opt);
 
     tokio::fs::create_dir_all("/run/adam").await.unwrap();
-
-    let (etx, _) = tokio::sync::broadcast::channel(100);
 
     let event_emitting = tokio::task::spawn({
         let mut rx = rx.clone();
