@@ -292,12 +292,13 @@ pub enum InetProtocol {
     EXPERIMENTAL_AND_TESTING_0 = 253,
     /// Use for experimentation and testing
     EXPERIMENTAL_AND_TESTING_1 = 254,
-    Other(u8),
 }
 
-impl From<u8> for InetProtocol {
-    fn from(value: u8) -> Self {
-        match value {
+impl TryFrom<u8> for InetProtocol {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
             0 => Self::IPV6_HEADER_HOP_BY_HOP,
             1 => Self::ICMP,
             2 => Self::IGMP,
@@ -442,8 +443,8 @@ impl From<u8> for InetProtocol {
             142 => Self::ROHC,
             253 => Self::EXPERIMENTAL_AND_TESTING_0,
             254 => Self::EXPERIMENTAL_AND_TESTING_1,
-            x => Self::Other(x),
-        }
+            _ => return Err(()),
+        })
     }
 }
 
@@ -594,7 +595,6 @@ impl From<InetProtocol> for u8 {
             InetProtocol::ROHC => 142,
             InetProtocol::EXPERIMENTAL_AND_TESTING_0 => 253,
             InetProtocol::EXPERIMENTAL_AND_TESTING_1 => 254,
-            InetProtocol::Other(x) => x,
         }
     }
 }

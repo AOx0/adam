@@ -139,7 +139,7 @@ impl<P: AsRef<[u8]>> IPv4<P> {
     }
 
     pub fn slice(&self) -> &[u8] {
-        &self.slice.as_ref()
+        self.slice.as_ref()
     }
 
     pub fn version(&self) -> u8 {
@@ -205,8 +205,8 @@ impl<P: AsRef<[u8]>> IPv4<P> {
         (self.slice.as_ref()[6] >> 5) & 0b001 == 1
     }
 
-    pub fn protocol(&self) -> InetProtocol {
-        InetProtocol::from(self.slice.as_ref()[9])
+    pub fn protocol(&self) -> Result<InetProtocol, ()> {
+        InetProtocol::try_from(self.slice.as_ref()[9])
     }
 
     pub fn protocol_u8(&self) -> u8 {
@@ -223,7 +223,7 @@ impl<P: AsRef<[u8]>> IPv4<P> {
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-#[repr(usize)]
+#[repr(u8)]
 pub enum IPv4Size {
     S20 = 20,
     S24 = 24,

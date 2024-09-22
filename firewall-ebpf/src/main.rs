@@ -73,7 +73,7 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
 
             if let FirewallMatch::Protocol(p) = rule.matches {
                 bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
-                let protocol = ip4.protocol();
+                let protocol = ip4.protocol().or_drop()?;
 
                 if protocol == p {
                     return emit(ctx, rule.action, Some((i, socket_addr)));
