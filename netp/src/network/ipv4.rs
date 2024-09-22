@@ -220,6 +220,24 @@ impl<P: AsRef<[u8]>> IPv4<P> {
     pub fn size(&self) -> IPv4Size {
         self.size
     }
+
+    pub fn size_usize(&self) -> usize {
+        use IPv4Size::*;
+
+        match self.size {
+            S20 => 20,
+            S24 => 24,
+            S28 => 28,
+            S32 => 32,
+            S36 => 36,
+            S40 => 40,
+            S44 => 44,
+            S48 => 48,
+            S52 => 52,
+            S56 => 56,
+            S60 => 60,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]

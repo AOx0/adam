@@ -57,6 +57,24 @@ impl<'pkt> Tcp<&'pkt [u8]> {
         self.size
     }
 
+    pub fn size_usize(&self) -> usize {
+        use TcpSize::*;
+
+        match self.size {
+            S20 => 20,
+            S24 => 24,
+            S28 => 28,
+            S32 => 32,
+            S36 => 36,
+            S40 => 40,
+            S44 => 44,
+            S48 => 48,
+            S52 => 52,
+            S56 => 56,
+            S60 => 60,
+        }
+    }
+
     pub fn destination(&self) -> u16 {
         u16::from_be_bytes(*self.slice[2..4].first_chunk::<2>().unwrap())
     }
