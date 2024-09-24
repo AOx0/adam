@@ -1,5 +1,7 @@
 #![feature(let_chains)]
 
+use std::env;
+use std::fmt::Debug;
 use std::io::Error;
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -11,16 +13,25 @@ use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Bpf};
 use aya_log::BpfLogger;
 use clap::Parser;
+use diesel::sqlite::Sqlite;
+use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
+use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+use dotenv::dotenv;
 use firewall_common::{processor, FirewallEvent, FirewallRule, MAX_RULES};
 use log::{debug, info, warn};
-use message::async_bincode::tokio::AsyncBincodeStream;
+use message::async_bincode::tokio::{AsyncBincodeReader, AsyncBincodeStream};
 use message::{FirewallRequest, FirewallResponse, Message};
+use serde::{Deserialize, Serialize};
 use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
 use tokio::net::unix::SocketAddr;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::watch::{Receiver, Sender};
 use tokio::sync::{broadcast, Mutex};
 use tokio::{select, signal, sync};
+
+use diesel::prelude::*;
+use diesel_async::{AsyncConnection, RunQueryDsl};
 
 #[derive(Debug, Parser)]
 struct Opt {
@@ -33,6 +44,60 @@ enum State {
     Loaded,
     Terminated,
     Started,
+}
+
+diesel::table! {
+    rules (id) {
+        id -> Integer,
+        // name -> Text,
+        // description-> Text,
+        rule -> Blob,
+    }
+}
+
+pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+/// From: <https://github.com/weiznich/diesel_async/blob/5b8262b86d8ed0e13adbbc4aee39500b9931ef8d/examples/sync-wrapper/src/main.rs#L36>
+async fn run_migrations<A>(async_connection: A) -> Result<(), Box<dyn std::error::Error>>
+where
+    A: AsyncConnection<Backend = Sqlite> + 'static,
+{
+    info!("Running sqlite migrations");
+    let mut async_wrapper: AsyncConnectionWrapper<A> =
+        AsyncConnectionWrapper::from(async_connection);
+
+    tokio::task::spawn_blocking(move || {
+        async_wrapper.run_pending_migrations(MIGRATIONS).unwrap();
+    })
+    .await
+    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+}
+
+async fn init_db() -> SyncConnectionWrapper<SqliteConnection> {
+    let db = get_db().await;
+
+    run_migrations(db).await.unwrap();
+    get_db().await
+}
+
+async fn get_db() -> SyncConnectionWrapper<SqliteConnection> {
+    dotenv().ok();
+
+    tokio::fs::create_dir_all("/var/lib/adam").await.unwrap();
+    let db = env::var("DATABASE_URL").unwrap_or("file:///var/lib/adam/firewall.db".to_string());
+
+    SyncConnectionWrapper::<SqliteConnection>::establish(&db)
+        .await
+        .unwrap()
+}
+
+#[derive(Serialize, Deserialize, Identifiable, Queryable, Insertable)]
+#[diesel(table_name = rules)]
+struct StoredRule {
+    pub id: i32,
+    // pub name: String,
+    // pub description: String,
+    pub rule: Vec<u8>,
 }
 
 #[tokio::main]
@@ -79,9 +144,9 @@ async fn main() -> Result<(), anyhow::Error> {
         ($name:expr) => {{
             let program0: &mut Xdp = bpf.program_mut($name).unwrap().try_into().unwrap();
             program0.load()?;
-            // program0
+            program0
         }};
-        ($at:expr, $name:expr) => {{
+        ($name:expr, $at:expr) => {{
             register!($name);
             let prog: &Xdp = bpf.program($name).unwrap().try_into().unwrap();
 
@@ -91,8 +156,19 @@ async fn main() -> Result<(), anyhow::Error> {
         }};
     }
 
+    let mut config: Array<&mut MapData, FirewallRule> =
+        Array::try_from(bpf.map_mut("FIREWALL_RULES").unwrap()).unwrap();
+    let db = &mut init_db().await;
+
+    let rules: Vec<StoredRule> = rules::table.load(db).await.unwrap();
+    for rule in rules {
+        let deserialize_from: FirewallRule =
+            bincode::deserialize_from(rule.rule.as_slice()).unwrap();
+        config.set(rule.id as u32, deserialize_from, 0).unwrap();
+    }
+
     register!("firewall");
-    register!(programs::IPV4_TCP, "ipv4_tcp");
+    register!("ipv4_tcp", programs::IPV4_TCP);
 
     let bpf = Arc::new(Mutex::new(bpf));
     let opt = Arc::new(opt);
@@ -281,6 +357,17 @@ async fn handle_message(
                             if let Ok(FirewallRule { init: false, .. }) = config.get(&idx, 0) {
                                 rule.id = idx;
                                 config.set(idx, rule, 0).unwrap();
+                                let mut db = get_db().await;
+
+                                diesel::insert_into(rules::table)
+                                    .values(StoredRule {
+                                        id: idx as i32,
+                                        rule: bincode::serialize(&rule).unwrap(),
+                                    })
+                                    .execute(&mut db)
+                                    .await
+                                    .unwrap();
+
                                 break 'res Some(FirewallResponse::Id(idx));
                             }
                         }
@@ -291,6 +378,13 @@ async fn handle_message(
                 FirewallRequest::DeleteRule(idx @ 0..MAX_RULES) => {
                     if let Ok(mut rule @ FirewallRule { init: true, .. }) = config.get(&idx, 0) {
                         rule.init = false;
+                        let mut db = get_db().await;
+
+                        diesel::delete(rules::table.filter(rules::dsl::id.eq(idx as i32)))
+                            .execute(&mut db)
+                            .await
+                            .unwrap();
+
                         config.set(idx, rule, 0).unwrap();
                     }
                     None
@@ -307,6 +401,15 @@ async fn handle_message(
                         && rule.enabled != action
                     {
                         rule.enabled = action;
+
+                        let mut db = get_db().await;
+
+                        diesel::update(rules::table.filter(rules::dsl::id.eq(idx as i32)))
+                            .set(rules::dsl::rule.eq(bincode::serialize(&rule).unwrap()))
+                            .execute(&mut db)
+                            .await
+                            .unwrap();
+
                         config.set(idx, rule, 0).unwrap();
                     }
                     None
