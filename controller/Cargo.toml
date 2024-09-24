@@ -9,5 +9,5 @@ message = { path = "../message" }
 axum = { version = "0.7.5", features = ["ws"] }
 serde_json.workspace = true
 serde.workspace = true
-deadpool = "0.12.1"
+deadpool.workspace = true
 futures.workspace = true
