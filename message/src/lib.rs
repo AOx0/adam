@@ -1,7 +1,6 @@
 pub use async_bincode;
 pub use firewall_common;
 
-use firewall_common::FirewallRule;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -11,40 +10,44 @@ pub enum Message {
     Terminate,
     Start,
     Halt,
-    Firewall(FirewallRequest),
+    Firewall(firewall::Request),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum FirewallResponse {
-    Id(u32),
-    ListFull,
-    Rules(Vec<FirewallRule>),
-    Rule(FirewallRule),
-    DoesNotExist,
-    Status(FirewallStatus),
-}
+pub mod firewall {
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum FirewallStatus {
-    Stopped,
-    Running,
-}
+    use serde::{Deserialize, Serialize};
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+    pub enum Response {
+        Id(u32),
+        ListFull,
+        Rules(Vec<firewall_common::StoredRuleDecoded>),
+        Rule(firewall_common::StoredRuleDecoded),
+        DoesNotExist,
+        Status(Status),
+    }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum FirewallRequest {
-    AddRule(FirewallRule),
-    DeleteRule(u32),
-    EnableRule(u32),
-    DisableRule(u32),
-    GetRule(u32),
-    GetRules,
-    Status,
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+    pub enum Status {
+        Stopped,
+        Running,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+    pub enum Request {
+        AddRule(firewall_common::StoredRuleDecoded),
+        DeleteRule(u32),
+        EnableRule(u32),
+        DisableRule(u32),
+        GetRule(u32),
+        GetRules,
+        Status,
+    }
 }
 
 #[cfg(test)]
@@ -56,7 +59,7 @@ mod test {
     pub fn print_schamas() {
         use schemars::{schema_for, JsonSchema};
 
-        let schema = schema_for!(FirewallRule);
+        let schema = schema_for!(Rule);
         println!("{}", serde_json::to_string_pretty(&schema).unwrap());
     }
 }

@@ -18,10 +18,11 @@ use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
 use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
-use firewall_common::{processor, FirewallEvent, FirewallRule, MAX_RULES};
+use firewall_common::{processor, Event, Rule, StoredRuleDecoded, MAX_RULES};
 use log::{debug, info, warn};
-use message::async_bincode::tokio::{AsyncBincodeReader, AsyncBincodeStream};
-use message::{FirewallRequest, FirewallResponse, Message};
+use message::async_bincode::tokio::AsyncBincodeStream;
+use message::firewall::*;
+use message::Message;
 use serde::{Deserialize, Serialize};
 use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
 use tokio::net::unix::SocketAddr;
@@ -156,14 +157,13 @@ async fn main() -> Result<(), anyhow::Error> {
         }};
     }
 
-    let mut config: Array<&mut MapData, FirewallRule> =
+    let mut config: Array<&mut MapData, Rule> =
         Array::try_from(bpf.map_mut("FIREWALL_RULES").unwrap()).unwrap();
     let db = &mut init_db().await;
 
     let rules: Vec<StoredRule> = rules::table.load(db).await.unwrap();
     for rule in rules {
-        let deserialize_from: FirewallRule =
-            bincode::deserialize_from(rule.rule.as_slice()).unwrap();
+        let deserialize_from: Rule = bincode::deserialize_from(rule.rule.as_slice()).unwrap();
         config.set(rule.id as u32, deserialize_from, 0).unwrap();
     }
 
@@ -185,8 +185,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 select! {
                     Ok((s, _addr)) = listener.accept() => {
                         tokio::task::spawn({
-
-                            let erx: broadcast::Receiver<FirewallEvent> = etx.subscribe();
+                            let erx: broadcast::Receiver<Event> = etx.subscribe();
                             let rx = rx.clone();
                             emit_to_suscriber(rx,erx, s)
                         });
@@ -299,16 +298,13 @@ async fn main() -> Result<(), anyhow::Error> {
 
 async fn emit_to_suscriber(
     mut rx: Receiver<State>,
-    mut erx: broadcast::Receiver<FirewallEvent>,
+    mut erx: broadcast::Receiver<Event>,
     s: UnixStream,
 ) {
     use message::async_bincode::tokio::AsyncBincodeWriter;
 
-    let mut s: AsyncBincodeWriter<
-        UnixStream,
-        FirewallEvent,
-        message::async_bincode::AsyncDestination,
-    > = AsyncBincodeWriter::from(s).for_async();
+    let mut s: AsyncBincodeWriter<UnixStream, Event, message::async_bincode::AsyncDestination> =
+        AsyncBincodeWriter::from(s).for_async();
     loop {
         select! {
             Ok(event) = erx.recv() => {
@@ -336,25 +332,27 @@ async fn handle_message(
     bpf: Arc<Mutex<Bpf>>,
     link: Arc<Mutex<Option<XdpLinkId>>>,
     rx: Receiver<State>,
-) -> Result<ControlFlow<(), Option<FirewallResponse>>> {
+) -> Result<ControlFlow<(), Option<Response>>> {
     Ok(match msg {
         Message::Firewall(msg) => {
             let mut guard = bpf.lock().await;
-            let mut config: Array<&mut MapData, FirewallRule> =
+            let mut config: Array<&mut MapData, Rule> =
                 Array::try_from(guard.map_mut("FIREWALL_RULES").unwrap()).unwrap();
 
             ControlFlow::Continue(match msg {
-                FirewallRequest::DisableRule(MAX_RULES..)
-                | FirewallRequest::EnableRule(MAX_RULES..)
-                | FirewallRequest::DeleteRule(MAX_RULES..)
-                | FirewallRequest::GetRule(MAX_RULES..) => None, // Ignore out of bounds rules
-                FirewallRequest::AddRule(mut rule) => {
+                Request::DisableRule(MAX_RULES..)
+                | Request::EnableRule(MAX_RULES..)
+                | Request::DeleteRule(MAX_RULES..)
+                | Request::GetRule(MAX_RULES..) => None, // Ignore out of bounds rules
+                Request::AddRule(meta) => {
+                    let mut rule = meta.rule;
+
                     rule.init = true;
                     rule.enabled = false;
 
                     'res: {
                         for idx in 0..MAX_RULES {
-                            if let Ok(FirewallRule { init: false, .. }) = config.get(&idx, 0) {
+                            if let Ok(Rule { init: false, .. }) = config.get(&idx, 0) {
                                 rule.id = idx;
                                 config.set(idx, rule, 0).unwrap();
                                 let mut db = get_db().await;
@@ -363,20 +361,22 @@ async fn handle_message(
                                     .values(StoredRule {
                                         id: idx as i32,
                                         rule: bincode::serialize(&rule).unwrap(),
+                                        name: meta.name,
+                                        description: meta.description,
                                     })
                                     .execute(&mut db)
                                     .await
                                     .unwrap();
 
-                                break 'res Some(FirewallResponse::Id(idx));
+                                break 'res Some(Response::Id(idx));
                             }
                         }
 
-                        Some(FirewallResponse::ListFull)
+                        Some(Response::ListFull)
                     }
                 }
-                FirewallRequest::DeleteRule(idx @ 0..MAX_RULES) => {
-                    if let Ok(mut rule @ FirewallRule { init: true, .. }) = config.get(&idx, 0) {
+                Request::DeleteRule(idx @ 0..MAX_RULES) => {
+                    if let Ok(mut rule @ Rule { init: true, .. }) = config.get(&idx, 0) {
                         rule.init = false;
                         let mut db = get_db().await;
 
@@ -389,15 +389,15 @@ async fn handle_message(
                     }
                     None
                 }
-                action @ FirewallRequest::EnableRule(idx @ 0..MAX_RULES)
-                | action @ FirewallRequest::DisableRule(idx @ 0..MAX_RULES) => {
+                action @ Request::EnableRule(idx @ 0..MAX_RULES)
+                | action @ Request::DisableRule(idx @ 0..MAX_RULES) => {
                     let action = match action {
-                        FirewallRequest::EnableRule(_) => true,
-                        FirewallRequest::DisableRule(_) => false,
+                        Request::EnableRule(_) => true,
+                        Request::DisableRule(_) => false,
                         _ => unreachable!("match only branches if enable/disable"),
                     };
 
-                    if let Ok(mut rule @ FirewallRule { init: true, .. }) = config.get(&idx, 0)
+                    if let Ok(mut rule @ Rule { init: true, .. }) = config.get(&idx, 0)
                         && rule.enabled != action
                     {
                         rule.enabled = action;
@@ -414,26 +414,63 @@ async fn handle_message(
                     }
                     None
                 }
-                FirewallRequest::GetRule(idx @ 0..MAX_RULES) => {
-                    if let Ok(rule @ FirewallRule { init: true, .. }) = config.get(&idx, 0) {
-                        return Ok(ControlFlow::Continue(Some(FirewallResponse::Rule(rule))));
+                Request::GetRule(idx @ 0..MAX_RULES) => {
+                    if let Ok(rule @ Rule { init: true, .. }) = config.get(&idx, 0) {
+                        let mut db = get_db().await;
+                        let meta = rules::table
+                            .filter(rules::id.eq(idx as i32))
+                            .first::<StoredRule>(&mut db)
+                            .await
+                            .unwrap();
+
+                        return Ok(ControlFlow::Continue(Some(Response::Rule(
+                            StoredRuleDecoded {
+                                id: rule.id as i32,
+                                name: meta.name,
+                                description: meta.description,
+                                rule,
+                            },
+                        ))));
                     }
 
-                    Some(FirewallResponse::DoesNotExist)
+                    Some(Response::DoesNotExist)
                 }
-                FirewallRequest::GetRules => {
+                Request::GetRules => {
                     let rules = config
                         .iter()
                         .flatten()
-                        .filter(|r| r.init)
+                        .enumerate()
+                        .filter(|r| r.1.init)
                         .collect::<Vec<_>>();
-                    Some(FirewallResponse::Rules(rules))
+
+                    let res = futures::future::join_all(rules.iter().map(|rule| {
+                        let id = rule.0 as i32;
+                        async move {
+                            let mut db = get_db().await;
+                            rules::table
+                                .filter(rules::id.eq(id))
+                                .first::<StoredRule>(&mut db)
+                                .await
+                                .unwrap()
+                        }
+                    }))
+                    .await;
+
+                    let rules = res
+                        .into_iter()
+                        .map(|s| StoredRuleDecoded {
+                            id: s.id,
+                            description: s.description,
+                            name: s.name,
+                            rule: rules.iter().find(|r| r.0 as i32 == s.id).unwrap().1,
+                        })
+                        .collect::<Vec<_>>();
+
+                    Some(Response::Rules(rules))
                 }
-                FirewallRequest::Status => Some(match *rx.borrow() {
-                    State::Loaded | State::Terminated => {
-                        FirewallResponse::Status(message::FirewallStatus::Stopped)
-                    }
-                    State::Started => FirewallResponse::Status(message::FirewallStatus::Running),
+                Request::Status => Some(match *rx.borrow() {
+                    State::Loaded | State::Terminated => Response::Status(Status::Stopped),
+                    State::Started => Response::Status(Status::Running),
                 }),
             })
         }
@@ -501,7 +538,7 @@ async fn handle_stream(
     let mut s: AsyncBincodeStream<
         UnixStream,
         Message,
-        FirewallResponse,
+        Response,
         message::async_bincode::AsyncDestination,
     > = AsyncBincodeStream::from(stream).for_async();
 
@@ -538,16 +575,16 @@ async fn handle_stream(
 
 async fn handle_event(
     guard: Result<AsyncFdReadyMutGuard<'_, RingBuf<MapData>>, Error>,
-    etx: &mut broadcast::Sender<FirewallEvent>,
+    etx: &mut broadcast::Sender<Event>,
 ) {
     let mut guard = guard.unwrap();
     let ring_buf = guard.get_inner_mut();
     while let Some(item) = ring_buf.next() {
-        let (_, [item], _) = (unsafe { item.align_to::<FirewallEvent>() }) else {
+        let (_, [item], _) = (unsafe { item.align_to::<Event>() }) else {
             continue;
         };
 
-        if let FirewallEvent::Pass = item {
+        if let Event::Pass = item {
             continue;
         }
 
@@ -555,8 +592,8 @@ async fn handle_event(
 
         info!("{:?}", item)
         // match item {
-        //     FirewallEvent::Blocked(_, _) => info!("{:?}", item),
-        //     FirewallEvent::Pass => {}
+        //     Event::Blocked(_, _) => info!("{:?}", item),
+        //     Event::Pass => {}
         // }
     }
     guard.clear_ready();

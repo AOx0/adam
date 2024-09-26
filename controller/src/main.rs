@@ -1,5 +1,5 @@
-use axum::{extract::Request, middleware::Next, response::Response};
 pub use axum::{extract::State, routing::post, Router};
+use axum::{middleware::Next, response::Response};
 use deadpool::managed::Pool;
 use tokio::net::TcpListener;
 
@@ -20,7 +20,7 @@ impl AppState {
     }
 }
 
-pub async fn insert_cors(req: Request, next: Next) -> Response {
+pub async fn insert_cors(req: axum::extract::Request, next: Next) -> Response {
     println!("Request: {req:?}");
     let mut response = next.run(req).await;
 
