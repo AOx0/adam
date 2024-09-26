@@ -205,6 +205,7 @@ impl<P: AsRef<[u8]>> IPv4<P> {
         (self.slice.as_ref()[6] >> 5) & 0b001 == 1
     }
 
+    #[allow(clippy::result_unit_err)]
     pub fn protocol(&self) -> Result<InetProtocol, ()> {
         InetProtocol::try_from(self.slice.as_ref()[9])
     }
