@@ -49,8 +49,8 @@ enum State {
 diesel::table! {
     rules (id) {
         id -> Integer,
-        // name -> Text,
-        // description-> Text,
+        name -> Text,
+        description-> Text,
         rule -> Blob,
     }
 }
@@ -91,12 +91,12 @@ async fn get_db() -> SyncConnectionWrapper<SqliteConnection> {
         .unwrap()
 }
 
-#[derive(Serialize, Deserialize, Identifiable, Queryable, Insertable)]
+#[derive(Serialize, Deserialize, Identifiable, Queryable, Insertable, Selectable)]
 #[diesel(table_name = rules)]
 struct StoredRule {
     pub id: i32,
-    // pub name: String,
-    // pub description: String,
+    pub name: String,
+    pub description: String,
     pub rule: Vec<u8>,
 }
 
