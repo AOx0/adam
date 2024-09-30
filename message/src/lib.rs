@@ -44,6 +44,7 @@ pub mod firewall {
         DeleteRule(u32),
         EnableRule(u32),
         DisableRule(u32),
+        ToggleRule(u32),
         GetRule(u32),
         GetRules,
         Status,

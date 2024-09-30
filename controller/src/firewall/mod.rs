@@ -54,6 +54,7 @@ pub fn router() -> Router<AppState> {
         .route("/delete/:idx", post(delete))
         .route("/enable/:idx", post(enable))
         .route("/disable/:idx", post(disable))
+        .route("/toggle/:idx", post(toggle))
         .route("/rule/:idx", get(get_rule))
         .route("/rules", get(get_rules))
         .route("/events", get(listen_events))
@@ -107,6 +108,10 @@ pub async fn enable(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
 
 pub async fn disable(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
     s.firewall_pool.get().await.unwrap().disable(idx).await;
+}
+
+pub async fn toggle(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
+    s.firewall_pool.get().await.unwrap().toggle(idx).await;
 }
 
 pub async fn get_rule(
@@ -170,6 +175,11 @@ impl Socket {
 
     pub async fn disable(&mut self, idx: u32) {
         self.send(Message::Firewall(firewall::Request::DisableRule(idx)))
+            .await;
+    }
+
+    pub async fn toggle(&mut self, idx: u32) {
+        self.send(Message::Firewall(firewall::Request::ToggleRule(idx)))
             .await;
     }
 
