@@ -9,9 +9,13 @@
 POST http://localhost/firewall/add
 Content-Type: application/json
 {
-    "action":"drop",
-    "matches":{"protocol":"ICMP"},
-    "applies_to":"source"
+    "name": "Disable pings",
+    "description": "Forbidden ICMPs",
+    "rule": {
+        "action":"drop",
+        "matches":{"protocol":"ICMP"},
+        "applies_to":"source"
+    }
 }
 HTTP 200
 [Captures]
@@ -20,9 +24,13 @@ rule-id: jsonpath "$['id']"
 POST http://localhost/firewall/add
 Content-Type: application/json
 {
-    "action":"drop",
-    "matches":{ "port": 8080 },
-    "applies_to":"source"
+    "name": "Block 8080",
+    "description": "Block access to port 8008",
+    "rule": {
+        "action":"drop",
+        "matches":{ "port": 8080 },
+        "applies_to":"source"
+    }
 }
 HTTP 200
 [Captures]

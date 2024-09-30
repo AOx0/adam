@@ -13,7 +13,7 @@ use netp::network::InetProtocol;
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum FirewallEvent {
+pub enum Event {
     Pass,
     Blocked {
         rule: u32,
@@ -25,7 +25,7 @@ pub enum FirewallEvent {
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum FirewallAction {
+pub enum Action {
     Accept,
     Drop,
 }
@@ -34,7 +34,7 @@ pub enum FirewallAction {
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub enum FirewallMatch {
+pub enum Match {
     Match(core::net::IpAddr),
     Socket(core::net::SocketAddr),
     Port(u16),
@@ -54,12 +54,12 @@ pub enum Direction {
 #[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct FirewallRule {
+pub struct Rule {
     /// id is set by the firewall controller when adding the new rule
     #[cfg_attr(feature = "user", serde(default))]
     pub id: u32,
-    pub action: FirewallAction,
-    pub matches: FirewallMatch,
+    pub action: Action,
+    pub matches: Match,
     pub applies_to: Direction,
     /// All rules are disabled by default
     #[cfg_attr(feature = "user", serde(default))]
@@ -70,14 +70,27 @@ pub struct FirewallRule {
 }
 
 #[cfg(feature = "user")]
-unsafe impl aya::Pod for FirewallRule {}
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct StoredRuleDecoded {
+    /// id is set by the firewall controller when adding the new rule
+    #[cfg_attr(feature = "user", serde(default))]
+    pub id: i32,
+    pub name: String,
+    pub description: String,
+    pub rule: Rule,
+}
+
+#[cfg(feature = "user")]
+unsafe impl aya::Pod for Rule {}
 
 #[cfg(feature = "bpf")]
-impl From<FirewallAction> for u32 {
-    fn from(value: FirewallAction) -> Self {
+impl From<Action> for u32 {
+    fn from(value: Action) -> Self {
         match value {
-            FirewallAction::Drop => aya_ebpf::bindings::xdp_action::XDP_DROP,
-            FirewallAction::Accept => aya_ebpf::bindings::xdp_action::XDP_PASS,
+            Action::Drop => aya_ebpf::bindings::xdp_action::XDP_DROP,
+            Action::Accept => aya_ebpf::bindings::xdp_action::XDP_PASS,
         }
     }
 }

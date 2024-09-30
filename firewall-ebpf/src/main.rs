@@ -10,15 +10,13 @@ use aya_ebpf::{
     maps::{Array, ProgramArray, RingBuf},
     programs::XdpContext,
 };
-use aya_log_ebpf::{error, info};
-use firewall_common::{
-    processor, Direction, FirewallAction, FirewallEvent, FirewallMatch, FirewallRule, MAX_RULES,
-};
+use aya_log_ebpf::error;
+use firewall_common::{processor, Action, Direction, Event, Match, Rule, MAX_RULES};
 use netp::{
     aya::XdpErr,
     bounds,
     link::{EtherType, Ethernet},
-    network::{IPv4, InetProtocol},
+    network::IPv4,
     transport::tcp::Tcp,
 };
 
@@ -29,7 +27,7 @@ static PROCESSOR: ProgramArray = ProgramArray::with_max_entries(50, 0);
 static FIREWALL_EVENTS: RingBuf = RingBuf::with_byte_size(4096, 0);
 
 #[map]
-static FIREWALL_RULES: Array<FirewallRule> = Array::with_max_entries(MAX_RULES, 0);
+static FIREWALL_RULES: Array<Rule> = Array::with_max_entries(MAX_RULES, 0);
 
 #[xdp]
 pub fn firewall(ctx: XdpContext) -> u32 {
@@ -57,7 +55,7 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
 
         for i in 0..MAX_RULES {
             let Some(
-                rule @ FirewallRule {
+                rule @ Rule {
                     init: true,
                     enabled: true,
                     ..
@@ -75,7 +73,7 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
             };
             let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_bits(matching_ip)), 0);
 
-            if let FirewallMatch::Protocol(p) = rule.matches {
+            if let Match::Protocol(p) = rule.matches {
                 bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
                 let protocol = ip4.protocol().or_drop()?;
 
@@ -84,7 +82,7 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
                 }
             }
 
-            if let FirewallMatch::Match(core::net::IpAddr::V4(addr)) = rule.matches {
+            if let Match::Match(core::net::IpAddr::V4(addr)) = rule.matches {
                 if addr.to_bits() == matching_ip {
                     return emit(ctx, rule.action, Some((i, socket_addr)));
                 }
@@ -94,7 +92,7 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
         unsafe { PROCESSOR.tail_call(&ctx, processor::IPV4_TCP).or_drop()? };
     }
 
-    emit(ctx, FirewallAction::Accept, None)
+    emit(ctx, Action::Accept, None)
 }
 
 #[xdp]
@@ -120,7 +118,7 @@ fn try_ipv4_tcp(ctx: XdpContext) -> Result<u32, u32> {
 
     for i in 0..MAX_RULES {
         let Some(
-            rule @ FirewallRule {
+            rule @ Rule {
                 init: true,
                 enabled: true,
                 ..
@@ -148,32 +146,28 @@ fn try_ipv4_tcp(ctx: XdpContext) -> Result<u32, u32> {
 
         let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_bits(ip)), port);
 
-        if let FirewallMatch::Port(rule_port) = rule.matches {
+        if let Match::Port(rule_port) = rule.matches {
             if rule_port == port {
                 return emit(ctx, rule.action, Some((i, socket_addr)));
             }
         }
     }
 
-    emit(ctx, FirewallAction::Accept, None)
+    emit(ctx, Action::Accept, None)
 }
 
-fn emit(
-    ctx: XdpContext,
-    action: FirewallAction,
-    socket: Option<(u32, SocketAddr)>,
-) -> Result<u32, u32> {
-    if let Some(mut entry) = FIREWALL_EVENTS.reserve::<FirewallEvent>(0) {
+fn emit(ctx: XdpContext, action: Action, socket: Option<(u32, SocketAddr)>) -> Result<u32, u32> {
+    if let Some(mut entry) = FIREWALL_EVENTS.reserve::<Event>(0) {
         unsafe {
             core::ptr::write_unaligned(
                 entry.as_mut_ptr(),
                 match action {
-                    FirewallAction::Accept => FirewallEvent::Pass,
-                    FirewallAction::Drop => {
+                    Action::Accept => Event::Pass,
+                    Action::Drop => {
                         if let Some((rule, addr)) = socket {
-                            FirewallEvent::Blocked { rule, addr }
+                            Event::Blocked { rule, addr }
                         } else {
-                            FirewallEvent::Pass
+                            Event::Pass
                         }
                     }
                 },
@@ -182,7 +176,7 @@ fn emit(
 
         entry.submit(0);
     } else {
-        error!(&ctx, "Failed to reserve entry for FirewallEvent")
+        error!(&ctx, "Failed to reserve entry for Event")
     }
 
     Ok(action.into())
