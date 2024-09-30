@@ -3,7 +3,7 @@
 use std::env;
 use std::fmt::Debug;
 use std::io::Error;
-use std::ops::ControlFlow;
+use std::ops::{ControlFlow, Not};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -343,6 +343,7 @@ async fn handle_message(
                 Request::DisableRule(MAX_RULES..)
                 | Request::EnableRule(MAX_RULES..)
                 | Request::DeleteRule(MAX_RULES..)
+                | Request::ToggleRule(MAX_RULES..)
                 | Request::GetRule(MAX_RULES..) => None, // Ignore out of bounds rules
                 Request::AddRule(meta) => {
                     let mut rule = meta.rule;
@@ -390,17 +391,36 @@ async fn handle_message(
                     None
                 }
                 action @ Request::EnableRule(idx @ 0..MAX_RULES)
-                | action @ Request::DisableRule(idx @ 0..MAX_RULES) => {
+                | action @ Request::DisableRule(idx @ 0..MAX_RULES)
+                | action @ Request::ToggleRule(idx @ 0..MAX_RULES) => {
+                    #[derive(PartialEq, Eq)]
+                    enum Action {
+                        Toggle,
+                        Enable,
+                        Disable,
+                    }
+
+                    impl Action {
+                        fn as_bool(&self) -> Option<bool> {
+                            match self {
+                                Action::Toggle => None,
+                                Action::Enable => Some(true),
+                                Action::Disable => Some(false),
+                            }
+                        }
+                    }
+
                     let action = match action {
-                        Request::EnableRule(_) => true,
-                        Request::DisableRule(_) => false,
+                        Request::EnableRule(_) => Action::Enable,
+                        Request::DisableRule(_) => Action::Disable,
+                        Request::ToggleRule(_) => Action::Toggle,
                         _ => unreachable!("match only branches if enable/disable"),
                     };
 
                     if let Ok(mut rule @ Rule { init: true, .. }) = config.get(&idx, 0)
-                        && rule.enabled != action
+                        && action.as_bool().unwrap_or(!rule.enabled) != rule.enabled
                     {
-                        rule.enabled = action;
+                        rule.enabled = action.as_bool().unwrap_or(!rule.enabled);
 
                         let mut db = get_db().await;
 
