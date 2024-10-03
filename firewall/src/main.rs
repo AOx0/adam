@@ -3,7 +3,7 @@
 use std::env;
 use std::fmt::Debug;
 use std::io::Error;
-use std::ops::{ControlFlow, Not};
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};

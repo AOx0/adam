@@ -1,5 +1,5 @@
 [workspace]
-members = ["xtask", "firewall", "firewall-common", "controller", "message", "netp"]
+members = ["xtask", "firewall", "firewall-common", "controller", "message", "netp", "front"]
 resolver = "2"
 
 [workspace.dependencies]

@@ -3,10 +3,13 @@ layout {
     // pane split_direction="horizontal" {
     pane split_direction="vertical" {
         pane command="just" {
-            args "run-firewall" "wlan0"
+            args "run-firewall" "$ADAM_FIREWALL_IFACE"
         }
         pane command="just" {
             args "run-controller"
+        }
+        pane command="just" {
+            args "run-front-watch"
         }
     }
     // }

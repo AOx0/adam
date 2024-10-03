@@ -1,12 +1,12 @@
 # # Verify rules start empty
-# GET http://localhost/firewall/rules
+# GET http://localhost:9988/firewall/rules
 # HTTP 200
 # [Asserts]
 # header "Content-Type" == "application/json"
 # body == "[]"
 
 # Submit a rule
-POST http://localhost/firewall/add
+POST http://localhost:9988/firewall/add
 Content-Type: application/json
 {
     "name": "Disable pings",
@@ -21,7 +21,7 @@ HTTP 200
 [Captures]
 rule-id: jsonpath "$['id']"
 
-POST http://localhost/firewall/add
+POST http://localhost:9988/firewall/add
 Content-Type: application/json
 {
     "name": "Block 8080",
@@ -36,15 +36,15 @@ HTTP 200
 [Captures]
 rule-id2: jsonpath "$['id']"
 
-GET http://localhost/firewall/rule/{{rule-id}}
+GET http://localhost:9988/firewall/rule/{{rule-id}}
 HTTP 200
-GET http://localhost/firewall/rule/{{rule-id2}}
-HTTP 200
-
-POST http://localhost/firewall/enable/{{rule-id}}
-HTTP 200
-POST http://localhost/firewall/enable/{{rule-id2}}
+GET http://localhost:9988/firewall/rule/{{rule-id2}}
 HTTP 200
 
-POST http://localhost/firewall/start
+POST http://localhost:9988/firewall/enable/{{rule-id}}
+HTTP 200
+POST http://localhost:9988/firewall/enable/{{rule-id2}}
+HTTP 200
+
+POST http://localhost:9988/firewall/start
 HTTP 200

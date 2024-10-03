@@ -1,8 +1,7 @@
 use axum::{
     extract::{ws::WebSocket, Path, State, WebSocketUpgrade},
     response::Response,
-    routing::{get, post},
-    Json, Router,
+    routing, Json, Router,
 };
 use deadpool::managed::Pool;
 use futures::{SinkExt, StreamExt};
@@ -47,18 +46,18 @@ impl deadpool::managed::Manager for Manager {
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/start", post(start))
-        .route("/stop", post(stop))
-        .route("/halt", post(halt))
-        .route("/add", post(add))
-        .route("/delete/:idx", post(delete))
-        .route("/enable/:idx", post(enable))
-        .route("/disable/:idx", post(disable))
-        .route("/toggle/:idx", post(toggle))
-        .route("/rule/:idx", get(get_rule))
-        .route("/rules", get(get_rules))
-        .route("/events", get(listen_events))
-        .route("/status", get(status))
+        .route("/start", routing::post(start))
+        .route("/stop", routing::post(stop))
+        .route("/halt", routing::post(halt))
+        .route("/add", routing::post(add))
+        .route("/delete/:idx", routing::delete(delete))
+        .route("/enable/:idx", routing::post(enable))
+        .route("/disable/:idx", routing::post(disable))
+        .route("/toggle/:idx", routing::post(toggle))
+        .route("/rule/:idx", routing::get(get_rule))
+        .route("/rules", routing::get(get_rules))
+        .route("/events", routing::get(listen_events))
+        .route("/status", routing::get(status))
 }
 
 #[derive(Debug)]

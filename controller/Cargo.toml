@@ -11,3 +11,4 @@ serde_json.workspace = true
 serde.workspace = true
 deadpool.workspace = true
 futures.workspace = true
+tower-http = { version = "0.6.1", features = ["cors"] }

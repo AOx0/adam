@@ -3,3 +3,9 @@ run-firewall iface='lo':
 
 run-controller:
     cargo build --release && sudo ./target/release/controller
+
+run-front:
+    cargo run --release --bin front
+    
+run-front-watch:
+    cargo watch -cqs "cargo run --release --bin front"
