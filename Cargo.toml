@@ -1,5 +1,5 @@
 [workspace]
-members = ["xtask", "firewall", "firewall-common", "controller", "message", "netp", "front"]
+members = ["xtask", "firewall", "firewall-common", "controller", "message", "netp", "front", "front-components"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -10,3 +10,4 @@ serde = { version = "1.0.210", features = ["derive"] }
 serde_json = { version = "1.0.128" }
 schemars = { version = "0.8.21" }
 deadpool = "0.12.1"
+maud = { version = "0.26.0", features = ["axum"] }

@@ -5,10 +5,13 @@ edition = "2021"
 
 [dependencies]
 axum = "0.7.6"
-maud = { version = "0.26.0", features = ["axum"] }
 reqwest = "0.12.7"
-serde_json.workspace = true
-message = { path = "../message" }
-firewall-common = { path = "../firewall-common", features = ["user"] }
 strum = { version = "0.26.3", features = ["derive"] }
 tokio = { version = "1.40.0", features = ["full"] }
+
+maud.workspace = true
+serde_json.workspace = true
+
+firewall-common = { path = "../firewall-common", features = ["user"] }
+message.path = "../message"
+front-components.path = "../front-components"
