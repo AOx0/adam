@@ -1,3 +1,6 @@
+run iface='lo':
+    env ADAM_FIREWALL_IFACE='{{iface}}' zellij --layout .zellij/run.kdl
+
 run-firewall iface='lo':
     RUST_LOG=info cargo xtask run firewall --release -- -i {{iface}}
 
