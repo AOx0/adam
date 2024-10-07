@@ -26,6 +26,24 @@ pub mod firewall {
         Rule(firewall_common::StoredRuleDecoded),
         DoesNotExist,
         Status(Status),
+        RuleChange(RuleChange),
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+    pub enum RuleChange {
+        NoSuchRule,
+        NoChangeRequired(RuleStatus),
+        Change(RuleStatus),
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+    pub enum RuleStatus {
+        Active,
+        Inactive,
     }
 
     #[derive(Debug, Serialize, Deserialize)]

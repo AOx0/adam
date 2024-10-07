@@ -1,10 +1,11 @@
 use axum::{
-    extract::{ws::WebSocket, Path, State, WebSocketUpgrade},
+    extract::{ws::WebSocket, FromRequestParts, Path, State, WebSocketUpgrade},
     response::Response,
     routing, Json, Router,
 };
 use deadpool::managed::Pool;
 use futures::{SinkExt, StreamExt};
+use maud::Markup;
 use message::{
     async_bincode::{tokio::AsyncBincodeStream, AsyncDestination},
     firewall,
@@ -13,7 +14,7 @@ use message::{
 };
 use tokio::net::UnixStream;
 
-use crate::AppState;
+use crate::{htmx::Htmx, AppState};
 
 #[derive(Debug, Clone)]
 pub struct Manager;
@@ -109,8 +110,33 @@ pub async fn disable(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
     s.firewall_pool.get().await.unwrap().disable(idx).await;
 }
 
-pub async fn toggle(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
-    s.firewall_pool.get().await.unwrap().toggle(idx).await;
+pub async fn toggle(
+    htmx: Htmx,
+    State(s): State<AppState>,
+    Path((idx,)): Path<(u32,)>,
+) -> Result<Markup, ()> {
+    let change = s.firewall_pool.get().await.unwrap().toggle(idx).await;
+
+    let status = match change {
+        firewall::RuleChange::NoSuchRule => None,
+        firewall::RuleChange::NoChangeRequired(rule_status) => Some(rule_status),
+        firewall::RuleChange::Change(rule_status) => Some(rule_status),
+    };
+
+    htmx.enabled()
+        .then_some({
+            status.map(|s| {
+                front_components::rule_status(
+                    match s {
+                        firewall::RuleStatus::Active => true,
+                        firewall::RuleStatus::Inactive => false,
+                    },
+                    idx,
+                )
+            })
+        })
+        .flatten()
+        .ok_or(())
 }
 
 pub async fn get_rule(
@@ -167,19 +193,40 @@ impl Socket {
             .await;
     }
 
-    pub async fn enable(&mut self, idx: u32) {
+    pub async fn enable(&mut self, idx: u32) -> firewall::RuleChange {
         self.send(Message::Firewall(firewall::Request::EnableRule(idx)))
             .await;
+
+        let read = self.read().await;
+        let firewall::Response::RuleChange(change) = read else {
+            unreachable!("It should always");
+        };
+
+        change
     }
 
-    pub async fn disable(&mut self, idx: u32) {
+    pub async fn disable(&mut self, idx: u32) -> firewall::RuleChange {
         self.send(Message::Firewall(firewall::Request::DisableRule(idx)))
             .await;
+
+        let read = self.read().await;
+        let firewall::Response::RuleChange(change) = read else {
+            unreachable!("It should always");
+        };
+
+        change
     }
 
-    pub async fn toggle(&mut self, idx: u32) {
+    pub async fn toggle(&mut self, idx: u32) -> firewall::RuleChange {
         self.send(Message::Firewall(firewall::Request::ToggleRule(idx)))
             .await;
+
+        let read = self.read().await;
+        let firewall::Response::RuleChange(change) = read else {
+            unreachable!("It should always");
+        };
+
+        change
     }
 
     pub async fn add(&mut self, rule: StoredRuleDecoded) {
@@ -215,11 +262,7 @@ impl Socket {
 
         match self.read().await {
             firewall::Response::Rules(rules) => rules,
-            firewall::Response::DoesNotExist => vec![],
-            firewall::Response::Id(_) => unreachable!(),
-            firewall::Response::Rule(_) => unreachable!(),
-            firewall::Response::ListFull => unreachable!(),
-            firewall::Response::Status(_) => unreachable!(),
+            _ => unreachable!(),
         }
     }
 

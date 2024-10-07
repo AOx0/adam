@@ -45,23 +45,7 @@ async fn home(templ: Template) -> Markup {
                                 code .bg-gray-100 .p-1 { (serde_json::to_string(&rule.rule).unwrap()) }
                             }
 
-                            td .pl-8 .text-center {
-                                @let color = { if rule.rule.enabled { "lime" } else { "rose" } };
-                                @let text = { if rule.rule.enabled { "Enabled" } else { "Disabled" } };
-                                @let enabled = { if rule.rule.enabled { "true" } else { "false" } };
-
-                                button
-                                    x-data={"{ enabled: " (enabled) " }"}
-                                    "x-on:click"="enabled = !enabled;" 
-                                    hx-post={ "http://127.0.0.1:9988/firewall/toggle/" (rule.id) }
-                                    hx-swap="none"
-                                    .{ "bg-"(color)"-200" }
-                                    .{ "border-"(color)"-800" }
-                                    .{ "text-"(color)"-800" }
-                                    .border.rounded-full
-                                    .px-2
-                                    { (text) }
-                            }
+                            td .pl-8 .text-center { (front_components::rule_status(rule.rule.enabled, rule.id as u32)) }
                             td .pl-8 {
                                 button
                                     hx-delete={ "http://127.0.0.1:9988/firewall/delete/" (rule.id) }
