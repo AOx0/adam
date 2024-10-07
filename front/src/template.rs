@@ -1,5 +1,6 @@
 use axum::http::request::Parts;
 use axum::{async_trait, extract::FromRequestParts};
+use front_components::Ref;
 use maud::{html, Markup, DOCTYPE};
 use strum::{EnumIter, IntoEnumIterator};
 
@@ -45,17 +46,14 @@ impl FromRequestParts<()> for Template {
     type Rejection = ();
 
     async fn from_request_parts(parts: &mut Parts, _state: &()) -> Result<Self, Self::Rejection> {
-        if parts.headers.get("HX-Request").is_some() {
-            Ok(Template {
-                title: format!("ADAM - {}", parts.uri.path()),
-                mode: ContentMode::Embedded,
-            })
-        } else {
-            Ok(Template {
-                title: format!("ADAM - {}", parts.uri.path()),
-                mode: ContentMode::Full,
-            })
-        }
+        Ok(Template {
+            title: format!("ADAM - {}", parts.uri.path()),
+            mode: if parts.headers.get("HX-Request").is_some() {
+                ContentMode::Embedded
+            } else {
+                ContentMode::Full
+            },
+        })
     }
 }
 
@@ -78,22 +76,6 @@ impl maud::Render for Section {
     fn render(&self) -> Markup {
         html! {
             (format!("{:?}", self))
-        }
-    }
-}
-
-#[allow(non_snake_case)]
-fn Ref(title: impl maud::Render, href: &str) -> Markup {
-    html! {
-        span
-            .text-sm.font-medium."space-x-4"
-            .text-foreground.transition-colors
-        {
-            p."hover:text-foreground/80"."text-foreground/60"
-            hx-boost="true"
-            hx-push-url="true"
-            hx-target="#main"
-            hx-get={ (href) } { (title) }
         }
     }
 }

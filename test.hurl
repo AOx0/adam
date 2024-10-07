@@ -6,7 +6,7 @@
 # body == "[]"
 
 # Submit a rule
-POST http://localhost:9988/firewall/add
+POST http://localhost:9988/firewall/rules
 Content-Type: application/json
 {
     "name": "Disable pings",
@@ -21,7 +21,7 @@ HTTP 200
 [Captures]
 rule-id: jsonpath "$['id']"
 
-POST http://localhost:9988/firewall/add
+POST http://localhost:9988/firewall/rules
 Content-Type: application/json
 {
     "name": "Block 8080",
@@ -36,15 +36,15 @@ HTTP 200
 [Captures]
 rule-id2: jsonpath "$['id']"
 
-GET http://localhost:9988/firewall/rule/{{rule-id}}
+GET http://localhost:9988/firewall/rules/{{rule-id}}
 HTTP 200
-GET http://localhost:9988/firewall/rule/{{rule-id2}}
-HTTP 200
-
-POST http://localhost:9988/firewall/enable/{{rule-id}}
-HTTP 200
-POST http://localhost:9988/firewall/enable/{{rule-id2}}
+GET http://localhost:9988/firewall/rules/{{rule-id2}}
 HTTP 200
 
-POST http://localhost:9988/firewall/start
+POST http://localhost:9988/firewall/rules/{{rule-id}}/enable
+HTTP 200
+POST http://localhost:9988/firewall/rules/{{rule-id2}}/enable
+HTTP 200
+
+POST http://localhost:9988/firewall/state/start
 HTTP 200

@@ -1,5 +1,5 @@
 use axum::{
-    extract::{ws::WebSocket, FromRequestParts, Path, State, WebSocketUpgrade},
+    extract::{ws::WebSocket, Path, State, WebSocketUpgrade},
     response::Response,
     routing, Json, Router,
 };
@@ -46,19 +46,21 @@ impl deadpool::managed::Manager for Manager {
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new()
+    let state = Router::new()
         .route("/start", routing::post(start))
         .route("/stop", routing::post(stop))
         .route("/halt", routing::post(halt))
-        .route("/add", routing::post(add))
-        .route("/delete/:idx", routing::delete(delete))
-        .route("/enable/:idx", routing::post(enable))
-        .route("/disable/:idx", routing::post(disable))
-        .route("/toggle/:idx", routing::post(toggle))
-        .route("/rule/:idx", routing::get(get_rule))
-        .route("/rules", routing::get(get_rules))
         .route("/events", routing::get(listen_events))
-        .route("/status", routing::get(status))
+        .route("/", routing::get(status));
+
+    let rules = Router::new()
+        .route("/:idx/enable", routing::post(enable))
+        .route("/:idx/disable", routing::post(disable))
+        .route("/:idx/toggle", routing::post(toggle))
+        .route("/:idx", routing::get(get_rule).delete(delete))
+        .route("/", routing::get(get_rules).post(add));
+
+    Router::new().nest("/rules", rules).nest("/state", state)
 }
 
 #[derive(Debug)]
