@@ -64,6 +64,9 @@ async fn rules(templ: Template) -> Markup {
     templ.render(html! {
         div .space-5 .m-5 {
             h1 .text-xl .font-bold { "Firewall" }
+
+            p { "Status: " span hx-get="http://127.0.0.1:9988/firewall/state" hx-trigger="load, every 30s" {} }
+            
             table .table-auto .text-left .border-separate   {
                 thead {
                     tr {

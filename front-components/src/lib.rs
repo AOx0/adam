@@ -33,3 +33,21 @@ pub fn rule_status(enabled: bool, id: u32) -> Markup {
             { (text) }
     }
 }
+
+pub fn status(enabled: bool, toggle_url: &str) -> Markup {
+    html! {
+        @let color = { if enabled { "lime" } else { "rose" } };
+        @let text = { if enabled { "Enabled" } else { "Disabled" } };
+
+        button
+            hx-post=(toggle_url)
+            hx-swap="outerHTML"
+            .{ "bg-"(color)"-200" }
+            .{ "border-"(color)"-800" }
+            .{ "text-"(color)"-800" }
+            .border.rounded-full
+            .px-2
+            .text-sm
+            { (text) }
+    }
+}

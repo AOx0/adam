@@ -1,6 +1,6 @@
 use axum::{
     extract::{ws::WebSocket, Path, State, WebSocketUpgrade},
-    response::Response,
+    response::{IntoResponse, Response},
     routing, Json, Router,
 };
 use deadpool::managed::Pool;
@@ -8,7 +8,7 @@ use futures::{SinkExt, StreamExt};
 use maud::Markup;
 use message::{
     async_bincode::{tokio::AsyncBincodeStream, AsyncDestination},
-    firewall,
+    firewall::{self, Status},
     firewall_common::{Event, StoredRuleDecoded},
     Message,
 };
@@ -47,6 +47,7 @@ impl deadpool::managed::Manager for Manager {
 
 pub fn router() -> Router<AppState> {
     let state = Router::new()
+        .route("/toggle", routing::post(toggle_fire))
         .route("/start", routing::post(start))
         .route("/stop", routing::post(stop))
         .route("/halt", routing::post(halt))
@@ -68,8 +69,18 @@ pub struct Socket {
     stream: AsyncBincodeStream<UnixStream, firewall::Response, Message, AsyncDestination>,
 }
 
-pub async fn status(State(state): State<AppState>) -> Json<firewall::Status> {
-    Json(state.firewall_pool.get().await.unwrap().status().await)
+pub async fn status(htmx: Htmx, State(state): State<AppState>) -> impl IntoResponse {
+    let status = state.firewall_pool.get().await.unwrap().status().await;
+
+    if htmx.enabled() {
+        front_components::status(
+            status == Status::Running,
+            "http://127.0.0.1:9988/firewall/state/toggle",
+        )
+        .into_response()
+    } else {
+        Json(status).into_response()
+    }
 }
 
 pub async fn event_dispatcher(mut socket: WebSocket) {
@@ -163,6 +174,25 @@ pub async fn add(
 
 pub async fn start(State(s): State<AppState>) {
     s.firewall_pool.get().await.unwrap().start().await;
+}
+
+pub async fn toggle_fire(htmx: Htmx, State(s): State<AppState>) -> Result<impl IntoResponse, ()> {
+    let status = s.firewall_pool.get().await.unwrap().status().await;
+
+    match status {
+        Status::Stopped => s.firewall_pool.get().await.unwrap().start().await,
+        Status::Running => s.firewall_pool.get().await.unwrap().halt().await,
+    }
+
+    htmx.enabled()
+        .then(|| {
+            front_components::status(
+                status != Status::Running,
+                "http://127.0.0.1:9988/firewall/state/toggle", // This is probably wrong
+            )
+            .into_response()
+        })
+        .ok_or(())
 }
 
 pub async fn stop(State(s): State<AppState>) {

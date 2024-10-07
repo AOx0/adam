@@ -46,7 +46,7 @@ pub mod firewall {
         Inactive,
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
     #[serde(rename_all = "snake_case")]
     #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
     pub enum Status {
