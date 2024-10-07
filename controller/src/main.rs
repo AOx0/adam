@@ -5,6 +5,7 @@ use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
 mod firewall;
+mod htmx;
 
 const POOL_SIZE: usize = 100;
 
