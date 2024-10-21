@@ -143,6 +143,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     macro_rules! register {
         ($name:expr) => {{
+            info!("Loading {}", $name);
             let program0: &mut Xdp = bpf.program_mut($name).unwrap().try_into().unwrap();
             program0.load()?;
             program0
