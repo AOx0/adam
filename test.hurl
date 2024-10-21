@@ -14,7 +14,7 @@ Content-Type: application/json
     "rule": {
         "action":"drop",
         "matches":{"protocol":"ICMP"},
-        "applies_to":"source"
+        "applies_to":"destination"
     }
 }
 HTTP 200
@@ -29,7 +29,7 @@ Content-Type: application/json
     "rule": {
         "action":"drop",
         "matches":{ "port": 8080 },
-        "applies_to":"source"
+        "applies_to":"destination"
     }
 }
 HTTP 200
