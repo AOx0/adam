@@ -73,6 +73,7 @@ pub mod firewall {
 #[cfg(feature = "schema")]
 mod test {
     use super::*;
+    use firewall_common::*;
 
     #[test]
     pub fn print_schamas() {
