@@ -48,6 +48,14 @@ enum State {
 }
 
 diesel::table! {
+    events (id) {
+        id -> Integer,
+        time -> Timestamp,
+        event -> Blob,
+    }
+}
+
+diesel::table! {
     rules (id) {
         id -> Integer,
         name -> Text,
