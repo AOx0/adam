@@ -82,7 +82,7 @@ pub struct StoredRuleDecoded {
     pub rule: Rule,
 }
 
-#[cfg(feature = "user")]
+#[cfg(feature = "aya")]
 unsafe impl aya::Pod for Rule {}
 
 #[cfg(feature = "bpf")]
