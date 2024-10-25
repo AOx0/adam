@@ -8,9 +8,6 @@ layout {
         pane command="just" {
             args "run-controller"
         }
-        pane command="just" {
-            args "run-front-watch"
-        }
     }
     // }
 }
