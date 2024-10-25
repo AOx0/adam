@@ -5,10 +5,10 @@ edition = "2021"
 
 [features]
 default = []
-user = ["dep:serde", "netp/serde"]
+serde = ["dep:serde", "netp/serde"]
 aya = ["dep:aya"]
 bpf = ["dep:aya-ebpf"]
-schema = ["user", "dep:schemars", "netp/schema"]
+schema = ["serde", "dep:schemars", "netp/schema"]
 
 [dependencies]
 aya = { version = "0.12", optional = true }
