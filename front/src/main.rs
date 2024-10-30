@@ -93,6 +93,7 @@ async fn rules(templ: Template) -> Markup {
                                     (Ref("View", &format!("/firewall/rules/{}", rule.id)))
 
                                 button
+                                    .text-sm
                                     hx-delete={ "http://127.0.0.1:9988/firewall/rules/" (rule.id) }
                                     hx-target="closest tr"
                                     { "Delete" }
