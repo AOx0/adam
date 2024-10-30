@@ -36,8 +36,11 @@ async fn main() {
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_methods([axum::http::Method::POST, axum::http::Method::DELETE])
+        .allow_headers([
+            axum::http::HeaderName::from_static("hx-request"),
+            axum::http::HeaderName::from_static("hx-current-url"),
+        ]);
 
     let router = Router::new()
         .nest("/firewall", firewall::router())
