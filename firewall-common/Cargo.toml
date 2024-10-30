@@ -11,7 +11,7 @@ bpf = ["dep:aya-ebpf"]
 schema = ["serde", "dep:schemars", "netp/schema"]
 
 [dependencies]
-aya = { version = "0.12", optional = true }
+aya = { version = "0.13", optional = true }
 aya-ebpf = { version = "0.1.0", optional = true }
 netp.path = "../netp"
 serde = { workspace = true, optional = true }
