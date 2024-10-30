@@ -2,7 +2,7 @@ pub use axum::{extract::State, routing::post, Router};
 use axum::{middleware::Next, response::Response};
 use deadpool::managed::Pool;
 use tokio::net::TcpListener;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{CorsLayer, Any};
 
 mod firewall;
 mod htmx;
@@ -35,14 +35,7 @@ async fn main() {
     let state = AppState::new();
 
     let cors = CorsLayer::new()
-        .allow_origin([
-            "http://localhost:8880"
-                .parse::<axum::http::HeaderValue>()
-                .unwrap(),
-            "http://127.0.0.1:8880"
-                .parse::<axum::http::HeaderValue>()
-                .unwrap(),
-        ])
+        .allow_origin(Any)
         .allow_methods([axum::http::Method::POST, axum::http::Method::DELETE])
         .allow_headers([
             axum::http::HeaderName::from_static("hx-request"),
