@@ -3,7 +3,7 @@
 use std::env;
 use std::fmt::Debug;
 use std::io::Error;
-use std::ops::{ControlFlow, Not};
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -143,6 +143,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     macro_rules! register {
         ($name:expr) => {{
+            info!("Loading {}", $name);
             let program0: &mut Xdp = bpf.program_mut($name).unwrap().try_into().unwrap();
             program0.load()?;
             program0
@@ -342,9 +343,10 @@ async fn handle_message(
             ControlFlow::Continue(match msg {
                 Request::DisableRule(MAX_RULES..)
                 | Request::EnableRule(MAX_RULES..)
-                | Request::DeleteRule(MAX_RULES..)
-                | Request::ToggleRule(MAX_RULES..)
-                | Request::GetRule(MAX_RULES..) => None, // Ignore out of bounds rules
+                | Request::ToggleRule(MAX_RULES..) => {
+                    Some(Response::RuleChange(RuleChange::NoSuchRule))
+                }
+                Request::DeleteRule(MAX_RULES..) | Request::GetRule(MAX_RULES..) => None, // Ignore out of bounds rules
                 Request::AddRule(meta) => {
                     let mut rule = meta.rule;
 
@@ -417,22 +419,39 @@ async fn handle_message(
                         _ => unreachable!("match only branches if enable/disable"),
                     };
 
-                    if let Ok(mut rule @ Rule { init: true, .. }) = config.get(&idx, 0)
-                        && action.as_bool().unwrap_or(!rule.enabled) != rule.enabled
-                    {
-                        rule.enabled = action.as_bool().unwrap_or(!rule.enabled);
+                    'a: {
+                        if let Ok(mut rule @ Rule { init: true, .. }) = config.get(&idx, 0) {
+                            if action.as_bool().unwrap_or(!rule.enabled) == rule.enabled {
+                                break 'a Some(Response::RuleChange(RuleChange::NoChangeRequired(
+                                    if rule.enabled {
+                                        RuleStatus::Active
+                                    } else {
+                                        RuleStatus::Inactive
+                                    },
+                                )));
+                            }
 
-                        let mut db = get_db().await;
+                            rule.enabled = action.as_bool().unwrap_or(!rule.enabled);
 
-                        diesel::update(rules::table.filter(rules::dsl::id.eq(idx as i32)))
-                            .set(rules::dsl::rule.eq(bincode::serialize(&rule).unwrap()))
-                            .execute(&mut db)
-                            .await
-                            .unwrap();
+                            let mut db = get_db().await;
 
-                        config.set(idx, rule, 0).unwrap();
+                            diesel::update(rules::table.filter(rules::dsl::id.eq(idx as i32)))
+                                .set(rules::dsl::rule.eq(bincode::serialize(&rule).unwrap()))
+                                .execute(&mut db)
+                                .await
+                                .unwrap();
+
+                            config.set(idx, rule, 0).unwrap();
+
+                            Some(Response::RuleChange(RuleChange::Change(if rule.enabled {
+                                RuleStatus::Active
+                            } else {
+                                RuleStatus::Inactive
+                            })))
+                        } else {
+                            Some(Response::RuleChange(RuleChange::NoSuchRule))
+                        }
                     }
-                    None
                 }
                 Request::GetRule(idx @ 0..MAX_RULES) => {
                     if let Ok(rule @ Rule { init: true, .. }) = config.get(&idx, 0) {

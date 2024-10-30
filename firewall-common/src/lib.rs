@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "user"), no_std)]
+#![cfg_attr(not(feature = "serde"), no_std)]
 
 pub const MAX_RULES: u32 = 100;
 
@@ -10,8 +10,8 @@ pub use netp;
 use netp::network::InetProtocol;
 
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Event {
     Pass,
@@ -22,8 +22,8 @@ pub enum Event {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Action {
     Accept,
@@ -31,8 +31,8 @@ pub enum Action {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Match {
     Match(core::net::IpAddr),
@@ -42,8 +42,8 @@ pub enum Match {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Direction {
     Source,
@@ -51,38 +51,38 @@ pub enum Direction {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "user", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "user", serde(rename_all = "snake_case"))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Rule {
     /// id is set by the firewall controller when adding the new rule
-    #[cfg_attr(feature = "user", serde(default))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub id: u32,
     pub action: Action,
     pub matches: Match,
     pub applies_to: Direction,
     /// All rules are disabled by default
-    #[cfg_attr(feature = "user", serde(default))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub enabled: bool,
     /// All added rules are marked as initialized
-    #[cfg_attr(feature = "user", serde(default))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub init: bool,
 }
 
-#[cfg(feature = "user")]
+#[cfg(feature = "serde")]
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StoredRuleDecoded {
     /// id is set by the firewall controller when adding the new rule
-    #[cfg_attr(feature = "user", serde(default))]
+    #[cfg_attr(feature = "serde", serde(default))]
     pub id: i32,
     pub name: String,
     pub description: String,
     pub rule: Rule,
 }
 
-#[cfg(feature = "user")]
+#[cfg(feature = "aya")]
 unsafe impl aya::Pod for Rule {}
 
 #[cfg(feature = "bpf")]

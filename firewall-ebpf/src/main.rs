@@ -10,7 +10,8 @@ use aya_ebpf::{
     maps::{Array, ProgramArray, RingBuf},
     programs::XdpContext,
 };
-use aya_log_ebpf::error;
+use aya_log_ebpf::{error, info};
+
 use firewall_common::{processor, Action, Direction, Event, Match, Rule, MAX_RULES};
 use netp::{
     aya::XdpErr,
@@ -42,15 +43,13 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
         core::slice::from_raw_parts_mut(ctx.data() as *mut u8, ctx.data_end() - ctx.data())
     };
 
-    bounds!(ctx, Ethernet::MIN_LEN).or_drop()?;
-    bounds!(ctx, Ethernet::MIN_LEN + IPv4::MIN_LEN).or_drop()?;
+    bounds!(ctx, 50).or_pass()?;
     let (eth, rem) = Ethernet::new(packet).or_pass()?;
 
     // TODO: Impl this
     // if let EtherType::IPv6 = eth.ethertype() {}
 
     if let EtherType::IPv4 = eth.ethertype() {
-        bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
         let (ip4, _): (IPv4<&[u8]>, &[u8]) = IPv4::new(rem).or_drop()?;
 
         for i in 0..MAX_RULES {
@@ -65,7 +64,8 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
                 continue;
             };
 
-            bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
+            // info!(&ctx, "try_firewall: Verifying rule on {}", rule.id);
+
             let matching_ip = if rule.applies_to == Direction::Source {
                 ip4.source_u32()
             } else {
@@ -74,7 +74,6 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
             let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::from_bits(matching_ip)), 0);
 
             if let Match::Protocol(p) = rule.matches {
-                bounds!(ctx, eth.size_usize() + IPv4::MIN_LEN).or_drop()?;
                 let protocol = ip4.protocol().or_drop()?;
 
                 if protocol == p {
@@ -109,12 +108,22 @@ fn try_ipv4_tcp(ctx: XdpContext) -> Result<u32, u32> {
         core::slice::from_raw_parts_mut(ctx.data() as *mut u8, ctx.data_end() - ctx.data())
     };
 
-    bounds!(ctx, Ethernet::MIN_LEN + IPv4::MIN_LEN + Tcp::MIN_LEN).or_drop()?;
+    bounds!(ctx, 50).or_pass()?;
     let (eth, rem) = Ethernet::new(packet).or_pass()?;
     let (ip4, rem) = IPv4::new(rem).or_drop()?;
 
     bounds!(ctx, eth.size_usize() + ip4.size_usize() + Tcp::MIN_LEN).or_drop()?;
     let (tcp, _) = Tcp::new(rem).or_drop()?;
+
+    // Avoid branching as much as possible
+    bounds!(ctx, Ethernet::MIN_LEN + IPv4::MIN_LEN + Tcp::MIN_LEN).or_drop()?;
+    let source_ip = ip4.source_u32();
+    let dest_ip = ip4.destination_u32();
+
+    // Avoid branching as much as possible
+    bounds!(ctx, eth.size_usize() + ip4.size_usize() + Tcp::MIN_LEN).or_drop()?;
+    let source = tcp.source();
+    let dest = tcp.destination();
 
     for i in 0..MAX_RULES {
         let Some(
@@ -128,15 +137,7 @@ fn try_ipv4_tcp(ctx: XdpContext) -> Result<u32, u32> {
             continue;
         };
 
-        // Avoid branching as much as possible
-        bounds!(ctx, Ethernet::MIN_LEN + IPv4::MIN_LEN + Tcp::MIN_LEN).or_drop()?;
-        let source_ip = ip4.source_u32();
-        let dest_ip = ip4.destination_u32();
-
-        // Avoid branching as much as possible
-        bounds!(ctx, eth.size_usize() + ip4.size_usize() + Tcp::MIN_LEN).or_drop()?;
-        let source = tcp.source();
-        let dest = tcp.destination();
+        // info!(&ctx, "try_ipv4_tcp: Verifying rule on {}", rule.id);
 
         let (ip, port) = if rule.applies_to == Direction::Source {
             (source_ip, source)
