@@ -4,7 +4,9 @@ use deadpool::managed::Pool;
 use tokio::net::TcpListener;
 use tower_http::cors::{CorsLayer, Any};
 
+mod auth;
 mod firewall;
+mod surreal;
 mod htmx;
 
 const POOL_SIZE: usize = 100;
@@ -12,11 +14,13 @@ const POOL_SIZE: usize = 100;
 #[derive(Debug, Clone)]
 struct AppState {
     firewall_pool: Pool<firewall::Manager>,
+    surreal_pool: Pool<surreal::Manager>,
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
+            surreal_pool: surreal::Manager::new(POOL_SIZE),
             firewall_pool: firewall::Manager::new(POOL_SIZE),
         }
     }
