@@ -12,6 +12,7 @@ use aya::programs::xdp::XdpLinkId;
 use aya::programs::{Xdp, XdpFlags};
 use aya::{include_bytes_aligned, Ebpf};
 use aya_log::EbpfLogger;
+use chrono::NaiveDateTime;
 use clap::Parser;
 use diesel::sqlite::Sqlite;
 use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
@@ -107,6 +108,13 @@ struct StoredRule {
     pub name: String,
     pub description: String,
     pub rule: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Queryable, Insertable, Selectable)]
+#[diesel(table_name = events)]
+struct StoredEvent {
+    pub time: NaiveDateTime,
+    pub event: Vec<u8>,
 }
 
 #[tokio::main]
@@ -626,6 +634,9 @@ async fn handle_event(
 ) {
     let mut guard = guard.unwrap();
     let ring_buf = guard.get_inner_mut();
+    let mut db = get_db().await;
+    let mut buffer = [0u8; std::mem::size_of::<Event>()];
+
     while let Some(item) = ring_buf.next() {
         let (_, [item], _) = (unsafe { item.align_to::<Event>() }) else {
             continue;
@@ -637,11 +648,17 @@ async fn handle_event(
 
         etx.send(*item).ok(); // We dont care if there are no event listeners
 
-        info!("{:?}", item)
-        // match item {
-        //     Event::Blocked(_, _) => info!("{:?}", item),
-        //     Event::Pass => {}
-        // }
+        info!("{:?}", item);
+
+        bincode::serialize_into(&mut buffer[..], item).unwrap();
+        diesel::insert_into(events::table)
+            .values(StoredEvent {
+                time: chrono::Local::now().naive_utc(),
+                event: buffer[..].to_vec(),
+            })
+            .execute(&mut db)
+            .await
+            .unwrap();
     }
     guard.clear_ready();
 }
