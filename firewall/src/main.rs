@@ -110,11 +110,20 @@ struct StoredRule {
     pub rule: Vec<u8>,
 }
 
+#[derive(Serialize, Deserialize, Identifiable, Queryable, Insertable, Selectable)]
+#[diesel(table_name = rules)]
+struct StoredRuleRef<'a> {
+    pub id: i32,
+    pub name: &'a str,
+    pub description: &'a str,
+    pub rule: &'a [u8],
+}
+
 #[derive(Serialize, Deserialize, Queryable, Insertable, Selectable)]
 #[diesel(table_name = events)]
-struct StoredEvent {
+struct StoredEventRef<'a> {
     pub time: NaiveDateTime,
-    pub event: Vec<u8>,
+    pub event: &'a [u8],
 }
 
 #[tokio::main]
@@ -375,13 +384,15 @@ async fn handle_message(
                                 rule.id = idx;
                                 config.set(idx, rule, 0).unwrap();
                                 let mut db = get_db().await;
+                                let mut buffer = [0u8; std::mem::size_of::<Rule>()];
 
+                                bincode::serialize_into(&mut buffer[..], &rule).unwrap();
                                 diesel::insert_into(rules::table)
-                                    .values(StoredRule {
+                                    .values(StoredRuleRef {
                                         id: idx as i32,
-                                        rule: bincode::serialize(&rule).unwrap(),
-                                        name: meta.name,
-                                        description: meta.description,
+                                        rule: &buffer,
+                                        name: &meta.name,
+                                        description: &meta.description,
                                     })
                                     .execute(&mut db)
                                     .await
@@ -652,9 +663,9 @@ async fn handle_event(
 
         bincode::serialize_into(&mut buffer[..], event).unwrap();
         diesel::insert_into(events::table)
-            .values(StoredEvent {
+            .values(StoredEventRef {
                 time: chrono::Local::now().naive_utc(),
-                event: buffer[..].to_vec(),
+                event: &buffer,
             })
             .execute(&mut db)
             .await
