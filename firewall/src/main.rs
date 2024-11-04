@@ -638,19 +638,19 @@ async fn handle_event(
     let mut buffer = [0u8; std::mem::size_of::<Event>()];
 
     while let Some(item) = ring_buf.next() {
-        let (_, [item], _) = (unsafe { item.align_to::<Event>() }) else {
+        let (_, [event], _) = (unsafe { item.align_to::<Event>() }) else {
             continue;
         };
 
-        if let Event::Pass = item {
+        if let Event::Pass = event {
             continue;
         }
 
-        etx.send(*item).ok(); // We dont care if there are no event listeners
+        etx.send(*event).ok(); // We dont care if there are no event listeners
 
-        info!("{:?}", item);
+        info!("{:?}", event);
 
-        bincode::serialize_into(&mut buffer[..], item).unwrap();
+        bincode::serialize_into(&mut buffer[..], event).unwrap();
         diesel::insert_into(events::table)
             .values(StoredEvent {
                 time: chrono::Local::now().naive_utc(),
