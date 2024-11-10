@@ -9,8 +9,8 @@ use maud::Markup;
 use message::{
     async_bincode::{tokio::AsyncBincodeStream, AsyncDestination},
     firewall::{self, Status},
-    firewall_common::{Event, StoredRuleDecoded},
-    Message,
+    firewall_common::{Event, StoredEventDecoded, StoredRuleDecoded},
+    EventQuery, Message,
 };
 use tokio::net::UnixStream;
 
@@ -52,6 +52,7 @@ pub fn router() -> Router<AppState> {
         .route("/stop", routing::post(stop))
         .route("/halt", routing::post(halt))
         .route("/events", routing::get(listen_events))
+        .route("/events/all", routing::get(query_all_events))
         .route("/", routing::get(status));
 
     let rules = Router::new()
@@ -67,6 +68,17 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug)]
 pub struct Socket {
     stream: AsyncBincodeStream<UnixStream, firewall::Response, Message, AsyncDestination>,
+}
+
+pub async fn query_all_events(State(s): State<AppState>) -> Json<Vec<StoredEventDecoded>> {
+    Json(
+        s.firewall_pool
+            .get()
+            .await
+            .unwrap()
+            .get_events(EventQuery::All)
+            .await,
+    )
 }
 
 pub async fn status(htmx: Htmx, State(state): State<AppState>) -> impl IntoResponse {
@@ -247,6 +259,18 @@ impl Socket {
         };
 
         change
+    }
+
+    pub async fn get_events(&mut self, query: EventQuery) -> Vec<StoredEventDecoded> {
+        self.send(Message::Firewall(firewall::Request::GetEvents(query)))
+            .await;
+
+        let read = self.read().await;
+        let firewall::Response::Events(events) = read else {
+            unreachable!("It should always return a list of events");
+        };
+
+        events
     }
 
     pub async fn toggle(&mut self, idx: u32) -> firewall::RuleChange {

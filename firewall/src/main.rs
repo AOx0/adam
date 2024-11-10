@@ -19,7 +19,7 @@ use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
 use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
-use firewall_common::{processor, Event, Rule, StoredRuleDecoded, MAX_RULES};
+use firewall_common::{processor, Event, Rule, StoredEventDecoded, StoredRuleDecoded, MAX_RULES};
 use log::{debug, info, warn};
 use message::async_bincode::tokio::AsyncBincodeStream;
 use message::firewall::*;
@@ -124,6 +124,13 @@ struct StoredRuleRef<'a> {
 struct StoredEventRef<'a> {
     pub time: NaiveDateTime,
     pub event: &'a [u8],
+}
+
+#[derive(Serialize, Deserialize, Queryable, Insertable, Selectable)]
+#[diesel(table_name = events)]
+struct StoredEvent {
+    pub time: NaiveDateTime,
+    pub event: Vec<u8>,
 }
 
 #[tokio::main]
@@ -538,6 +545,38 @@ async fn handle_message(
                     State::Loaded | State::Terminated => Response::Status(Status::Stopped),
                     State::Started => Response::Status(Status::Running),
                 }),
+                Request::GetEvents(event_query) => {
+                    let mut db = get_db().await;
+
+                    let events = match event_query {
+                        message::EventQuery::All => {
+                            events::table
+                                .select(StoredEvent::as_select())
+                                .load::<StoredEvent>(&mut db)
+                                .await
+                        }
+                        message::EventQuery::Last(duration) => {
+                            let since = chrono::Local::now().naive_utc() - duration;
+
+                            events::table
+                                .filter(events::time.ge(since))
+                                .select(StoredEvent::as_select())
+                                .load::<StoredEvent>(&mut db)
+                                .await
+                        }
+                    }
+                    .unwrap();
+
+                    let b = events
+                        .into_iter()
+                        .map(|e| StoredEventDecoded {
+                            time: e.time,
+                            event: bincode::deserialize_from(e.event.as_slice()).unwrap(),
+                        })
+                        .collect();
+
+                    Some(Response::Events(b))
+                }
             })
         }
         Message::Halt => {
