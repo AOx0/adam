@@ -564,6 +564,13 @@ async fn handle_message(
                                 .load::<StoredEvent>(&mut db)
                                 .await
                         }
+                        message::EventQuery::Since(datetime) => {
+                            events::table
+                                .filter(events::time.ge(datetime))
+                                .select(StoredEvent::as_select())
+                                .load::<StoredEvent>(&mut db)
+                                .await
+                        }
                     }
                     .unwrap();
 

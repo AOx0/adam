@@ -8,7 +8,7 @@ default = []
 serde = ["dep:serde", "netp/serde"]
 aya = ["dep:aya"]
 bpf = ["dep:aya-ebpf"]
-schema = ["serde", "dep:schemars", "netp/schema"]
+schema = ["serde", "dep:schemars", "netp/schema", "schemars/chrono"]
 chrono = ["dep:chrono"]
 
 [dependencies]

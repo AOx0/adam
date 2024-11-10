@@ -9,6 +9,7 @@ serde.workspace = true
 firewall-common = { path = "../firewall-common", features = ["serde", "chrono"] }
 schemars = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
+chrono.workspace = true
 
 [features]
 schema = ["dep:schemars", "firewall-common/schema", "dep:serde_json"]
