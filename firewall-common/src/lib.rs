@@ -82,6 +82,16 @@ pub struct StoredRuleDecoded {
     pub rule: Rule,
 }
 
+#[cfg(feature = "serde")]
+#[cfg(feature = "chrono")]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct StoredEventDecoded {
+    pub time: chrono::NaiveDateTime,
+    pub event: Event,
+}
+
 #[cfg(feature = "aya")]
 unsafe impl aya::Pod for Rule {}
 

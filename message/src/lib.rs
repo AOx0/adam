@@ -3,6 +3,8 @@ pub use firewall_common;
 
 use serde::{Deserialize, Serialize};
 
+pub mod firewall;
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -13,73 +15,47 @@ pub enum Message {
     Firewall(firewall::Request),
 }
 
-pub mod firewall {
-
-    use serde::{Deserialize, Serialize};
-    #[derive(Debug, Serialize, Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-    pub enum Response {
-        Id(u32),
-        ListFull,
-        Rules(Vec<firewall_common::StoredRuleDecoded>),
-        Rule(firewall_common::StoredRuleDecoded),
-        DoesNotExist,
-        Status(Status),
-        RuleChange(RuleChange),
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-    pub enum RuleChange {
-        NoSuchRule,
-        NoChangeRequired(RuleStatus),
-        Change(RuleStatus),
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-    pub enum RuleStatus {
-        Active,
-        Inactive,
-    }
-
-    #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
-    #[serde(rename_all = "snake_case")]
-    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-    pub enum Status {
-        Stopped,
-        Running,
-    }
-
-    #[derive(Debug, Serialize, Deserialize)]
-    #[serde(rename_all = "snake_case")]
-    #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-    pub enum Request {
-        AddRule(firewall_common::StoredRuleDecoded),
-        DeleteRule(u32),
-        EnableRule(u32),
-        DisableRule(u32),
-        ToggleRule(u32),
-        GetRule(u32),
-        GetRules,
-        Status,
-    }
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum EventQuery {
+    All,
+    Last(std::time::Duration),
+    Since(chrono::NaiveDateTime),
 }
 
 #[cfg(test)]
 #[cfg(feature = "schema")]
 mod test {
+
     use super::*;
     use firewall_common::*;
 
     #[test]
     pub fn print_schamas() {
         use schemars::{schema_for, JsonSchema};
+        use std::time::Duration;
 
-        let schema = schema_for!(Rule);
+        let schema = schema_for!(EventQuery);
         println!("{}", serde_json::to_string_pretty(&schema).unwrap());
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&EventQuery::All).unwrap()
+        );
+
+        let duration = Duration::from_secs(320);
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&EventQuery::Last(duration)).unwrap()
+        );
+
+        let since = chrono::Local::now().naive_utc() - Duration::from_secs(60 * 60 * 24 * 30);
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&EventQuery::Since(since)).unwrap()
+        );
     }
 }

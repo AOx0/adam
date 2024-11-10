@@ -19,7 +19,7 @@ use diesel_async::async_connection_wrapper::AsyncConnectionWrapper;
 use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
-use firewall_common::{processor, Event, Rule, StoredRuleDecoded, MAX_RULES};
+use firewall_common::{processor, Event, Rule, StoredEventDecoded, StoredRuleDecoded, MAX_RULES};
 use log::{debug, info, warn};
 use message::async_bincode::tokio::AsyncBincodeStream;
 use message::firewall::*;
@@ -108,6 +108,22 @@ struct StoredRule {
     pub name: String,
     pub description: String,
     pub rule: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Identifiable, Queryable, Insertable, Selectable)]
+#[diesel(table_name = rules)]
+struct StoredRuleRef<'a> {
+    pub id: i32,
+    pub name: &'a str,
+    pub description: &'a str,
+    pub rule: &'a [u8],
+}
+
+#[derive(Serialize, Deserialize, Queryable, Insertable, Selectable)]
+#[diesel(table_name = events)]
+struct StoredEventRef<'a> {
+    pub time: NaiveDateTime,
+    pub event: &'a [u8],
 }
 
 #[derive(Serialize, Deserialize, Queryable, Insertable, Selectable)]
@@ -375,13 +391,15 @@ async fn handle_message(
                                 rule.id = idx;
                                 config.set(idx, rule, 0).unwrap();
                                 let mut db = get_db().await;
+                                let mut buffer = [0u8; std::mem::size_of::<Rule>()];
 
+                                bincode::serialize_into(&mut buffer[..], &rule).unwrap();
                                 diesel::insert_into(rules::table)
-                                    .values(StoredRule {
+                                    .values(StoredRuleRef {
                                         id: idx as i32,
-                                        rule: bincode::serialize(&rule).unwrap(),
-                                        name: meta.name,
-                                        description: meta.description,
+                                        rule: &buffer,
+                                        name: &meta.name,
+                                        description: &meta.description,
                                     })
                                     .execute(&mut db)
                                     .await
@@ -527,6 +545,45 @@ async fn handle_message(
                     State::Loaded | State::Terminated => Response::Status(Status::Stopped),
                     State::Started => Response::Status(Status::Running),
                 }),
+                Request::GetEvents(event_query) => {
+                    let mut db = get_db().await;
+
+                    let events = match event_query {
+                        message::EventQuery::All => {
+                            events::table
+                                .select(StoredEvent::as_select())
+                                .load::<StoredEvent>(&mut db)
+                                .await
+                        }
+                        message::EventQuery::Last(duration) => {
+                            let since = chrono::Local::now().naive_utc() - duration;
+
+                            events::table
+                                .filter(events::time.ge(since))
+                                .select(StoredEvent::as_select())
+                                .load::<StoredEvent>(&mut db)
+                                .await
+                        }
+                        message::EventQuery::Since(datetime) => {
+                            events::table
+                                .filter(events::time.ge(datetime))
+                                .select(StoredEvent::as_select())
+                                .load::<StoredEvent>(&mut db)
+                                .await
+                        }
+                    }
+                    .unwrap();
+
+                    let b = events
+                        .into_iter()
+                        .map(|e| StoredEventDecoded {
+                            time: e.time,
+                            event: bincode::deserialize_from(e.event.as_slice()).unwrap(),
+                        })
+                        .collect();
+
+                    Some(Response::Events(b))
+                }
             })
         }
         Message::Halt => {
@@ -638,23 +695,23 @@ async fn handle_event(
     let mut buffer = [0u8; std::mem::size_of::<Event>()];
 
     while let Some(item) = ring_buf.next() {
-        let (_, [item], _) = (unsafe { item.align_to::<Event>() }) else {
+        let (_, [event], _) = (unsafe { item.align_to::<Event>() }) else {
             continue;
         };
 
-        if let Event::Pass = item {
+        if let Event::Pass = event {
             continue;
         }
 
-        etx.send(*item).ok(); // We dont care if there are no event listeners
+        etx.send(*event).ok(); // We dont care if there are no event listeners
 
-        info!("{:?}", item);
+        info!("{:?}", event);
 
-        bincode::serialize_into(&mut buffer[..], item).unwrap();
+        bincode::serialize_into(&mut buffer[..], event).unwrap();
         diesel::insert_into(events::table)
-            .values(StoredEvent {
+            .values(StoredEventRef {
                 time: chrono::Local::now().naive_utc(),
-                event: buffer[..].to_vec(),
+                event: &buffer,
             })
             .execute(&mut db)
             .await
