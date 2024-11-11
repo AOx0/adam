@@ -218,7 +218,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 select! {
                     Ok((s, _addr)) = listener.accept() => {
                         tokio::task::spawn({
-                            let erx: broadcast::Receiver<Event> = etx.subscribe();
+                            let erx: broadcast::Receiver<LogKind> = etx.subscribe();
                             let rx = rx.clone();
                             emit_to_suscriber(rx,erx, s)
                         });
@@ -331,12 +331,12 @@ async fn main() -> Result<(), anyhow::Error> {
 
 async fn emit_to_suscriber(
     mut rx: Receiver<State>,
-    mut erx: broadcast::Receiver<Event>,
+    mut erx: broadcast::Receiver<LogKind>,
     s: UnixStream,
 ) {
     use message::async_bincode::tokio::AsyncBincodeWriter;
 
-    let mut s: AsyncBincodeWriter<UnixStream, Event, message::async_bincode::AsyncDestination> =
+    let mut s: AsyncBincodeWriter<UnixStream, LogKind, message::async_bincode::AsyncDestination> =
         AsyncBincodeWriter::from(s).for_async();
     loop {
         select! {
@@ -687,7 +687,7 @@ async fn handle_stream(
 
 async fn handle_event(
     guard: Result<AsyncFdReadyMutGuard<'_, RingBuf<MapData>>, Error>,
-    etx: &mut broadcast::Sender<Event>,
+    etx: &mut broadcast::Sender<LogKind>,
 ) {
     let mut guard = guard.unwrap();
     let ring_buf = guard.get_inner_mut();
@@ -703,14 +703,20 @@ async fn handle_event(
             continue;
         }
 
-        etx.send(*event).ok(); // We dont care if there are no event listeners
+        let time = chrono::Local::now().naive_utc();
+        let stored = StoredEventDecoded {
+            time,
+            event: *event,
+        };
+
+        etx.send(LogKind::Event(stored)).ok(); // We dont care if there are no event listeners
 
         info!("{:?}", event);
 
         bincode::serialize_into(&mut buffer[..], event).unwrap();
         diesel::insert_into(events::table)
             .values(StoredEventRef {
-                time: chrono::Local::now().naive_utc(),
+                time,
                 event: &buffer,
             })
             .execute(&mut db)

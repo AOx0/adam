@@ -24,6 +24,14 @@ pub enum EventQuery {
     Since(chrono::NaiveDateTime),
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct Log<K> {
+    pub time: chrono::NaiveDateTime,
+    pub kind: K,
+}
+
 #[cfg(test)]
 #[cfg(feature = "schema")]
 mod test {

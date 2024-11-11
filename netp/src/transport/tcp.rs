@@ -52,7 +52,7 @@ impl<'pkt> Tcp<&'pkt mut [u8]> {
     }
 }
 
-impl<'pkt> Tcp<&'pkt [u8]> {
+impl Tcp<&[u8]> {
     pub fn size(&self) -> TcpSize {
         self.size
     }
