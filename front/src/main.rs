@@ -102,11 +102,53 @@ async fn rules(templ: Template) -> Markup {
     let rules: Vec<firewall_common::StoredRuleDecoded> =
         serde_json::from_str(&res.text().await.unwrap()).unwrap();
 
+    let ips = vec!["192.168.1.1", "192.168.1.2", "10.0.0.1"];
+
+    let selected_ip = "192.168.1.1";
+
     templ.render(html! {
         div .space-5 .m-5 {
             h1 .text-xl .font-bold { "Firewall" }
 
-            p { "Status: " span hx-get="http://127.0.0.1:9988/firewall/state" hx-trigger="load, every 30s" {} }
+            form {
+                label for="ip-select" { "Select IP address: " }
+                select
+                    name="ip"
+                    id="ip-select"
+                {
+                    @for ip in ips {
+                        @if ip == selected_ip {
+                            option value=(ip) selected { (ip) }
+                        } @else {
+                            option value=(ip) { (ip) }
+                        }
+                    }
+                }
+            }
+
+            p {
+                "Status: "
+                span #status
+                    hx-get={"http://" (selected_ip) "/firewall/state"}
+                    hx-trigger="load, every 30s, refresh"
+                    hx-indicator="#loading-indicator"
+                {
+                    "Cargando..."
+                }
+                div #loading-indicator { "Actualizando..." }
+            }
+
+            script type="text/javascript" {
+                (PreEscaped(r#"
+                document.getElementById('ip-select').addEventListener('change', function() {
+                    var selectedIp = this.value;
+                    var statusSpan = document.getElementById('status');
+                    statusSpan.setAttribute('hx-get', 'http://' + selectedIp + '/firewall/state');
+                    // Forzar una solicitud HTMX para actualizar el estado
+                    htmx.trigger(statusSpan, 'refresh');
+                });
+                "#))
+            }
 
             table .table-auto .text-left .border-separate   {
                 thead {
@@ -114,7 +156,6 @@ async fn rules(templ: Template) -> Markup {
                         th .pl-8 { "ID" }
                         th .pl-8 { "Name" }
                         th .pl-8 { "Description" }
-                        // th .pl-8 { "Contents" }
                         th .text-center .pl-8 { "Status" }
                         th .pl-8 { "Action" }
                     }
@@ -125,19 +166,16 @@ async fn rules(templ: Template) -> Markup {
                             td .pl-8 { (rule.id) }
                             td .pl-8 { (rule.name) }
                             td .pl-8 { (rule.description) }
-                            // td .pl-8 {
-                            //     code .bg-gray-100 .p-1 { (serde_json::to_string(&rule.rule).unwrap()) }
-                            // }
-
                             td .pl-8 .text-center { (front_components::rule_status(rule.rule.enabled, rule.id as u32)) }
                             td .pl-8 .space-x-5 {
-                                    (Ref("View", &format!("/firewall/rules/{}", rule.id)))
-
+                                (Ref("View", &format!("/firewall/rules/{}", rule.id)))
                                 button
                                     .text-sm
                                     hx-delete={ "http://127.0.0.1:9988/firewall/rules/" (rule.id) }
                                     hx-target="closest tr"
-                                    { "Delete" }
+                                {
+                                    "Delete"
+                                }
                             }
                         }
                     }
