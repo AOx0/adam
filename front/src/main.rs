@@ -1,26 +1,87 @@
-use axum::{extract::Path, routing::*, Router};
+use axum::{extract::Path, routing::*, Router, State};
 use front_components::Ref;
 use maud::{html, Markup, PreEscaped};
 use rand::RngCore;
 use template::Template;
 use tokio::net::TcpListener;
 
+use tokio::sync::RwLock;
+use std::sync::Arc;
+
+use axum::{Json, extract::{Path, State}};
+use serde::Deserialize;
+
 mod template;
+
+// Struct for IP input
+#[derive(Deserialize)]
+struct IpInput {
+    ip: String,
+}
+
+// Endpoint to add an IP
+async fn add_ip(State(state): State<Arc<AppState>>, Json(input): Json<IpInput>) -> impl IntoResponse {
+    let mut ips = state.registered_ips.write().await;
+    ips.push(input.ip);
+    "IP added".into_response()
+}
+
+// Endpoint to delete an IP
+async fn delete_ip(State(state): State<Arc<AppState>>, Path(ip): Path<String>) -> impl IntoResponse {
+    let mut ips = state.registered_ips.write().await;
+    ips.retain(|x| x != &ip);
+    "IP removed".into_response()
+}
+
+// Endpoint to get all IPs
+async fn get_ips(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let ips = state.registered_ips.read().await;
+    Json(&*ips).into_response()
+}
+
+// Endpoint to set the selected IP
+async fn set_selected_ip(
+    State(state): State<Arc<AppState>>,
+    Json(input): Json<IpInput>,
+) -> impl IntoResponse {
+    *state.selected_ip.write().await = input.ip;
+    "Selected IP updated".into_response()
+}
+
+struct AppState {
+    registered_ips: RwLock<Vec<String>>,
+    selected_ip: RwLock<String>,
+}
 
 #[tokio::main]
 async fn main() {
+    let state = Arc::new(AppState {
+        registered_ips: RwLock::new(vec![
+            "192.168.1.1".to_string(),
+            "192.168.1.2".to_string(),
+            "10.0.0.1".to_string(),
+        ]),
+        selected_ip: RwLock::new("192.168.1.1".to_string()),
+    });
+
     let firewall_router = Router::new()
         .route("/events", get(firewall_events))
         .route("/rules", get(rules))
         .route("/rules/:id", get(rule));
-
+    
     let router = Router::new()
         .route("/", get(home))
         .nest("/firewall", firewall_router)
+        .nest("/api", ip_router)
+        .with_state(state)
         .fallback(not_found);
 
+    let ip_router = Router::new()
+        .route("/ips", post(add_ip).get(get_ips))
+        .route("/ips/selected", post(set_selected_ip))
+        .route("/ips/:ip", delete(delete_ip));
+    
     let listener = TcpListener::bind("[::]:8880").await.unwrap();
-
     axum::serve(listener, router).await.unwrap();
 }
 
@@ -68,8 +129,13 @@ async fn home(templ: Template) -> Markup {
     })
 }
 
-async fn rule(templ: Template, Path((idx,)): Path<(u32,)>) -> Markup {
-    let res = reqwest::get(format!("http://127.0.0.1:9988/firewall/rules/{idx}"))
+async fn rule(
+    templ: Template,
+    Path((idx,)): Path<(u32,)>,
+    State(state): State<Arc<AppState>>,
+) -> Markup {
+    let selected_ip = state.selected_ip.read().await.clone();
+    let res = reqwest::get(format!("http://{selected_ip}:9988/firewall/rules/{idx}"))
         .await
         .unwrap();
 
@@ -94,17 +160,16 @@ async fn rule(templ: Template, Path((idx,)): Path<(u32,)>) -> Markup {
     })
 }
 
-async fn rules(templ: Template) -> Markup {
-    let res = reqwest::get("http://127.0.0.1:9988/firewall/rules")
+async fn rules(templ: Template, State(state): State<Arc<AppState>>) -> Markup {
+    let ips = state.registered_ips.read().await.clone();
+    let selected_ip = state.selected_ip.read().await.clone();
+
+    let res = reqwest::get(format!("http://{selected_ip}:9988/firewall/rules"))
         .await
         .unwrap();
 
     let rules: Vec<firewall_common::StoredRuleDecoded> =
         serde_json::from_str(&res.text().await.unwrap()).unwrap();
-
-    let ips = vec!["192.168.1.1", "192.168.1.2", "10.0.0.1"];
-
-    let selected_ip = "192.168.1.1";
 
     templ.render(html! {
         div .space-5 .m-5 {
@@ -116,8 +181,8 @@ async fn rules(templ: Template) -> Markup {
                     name="ip"
                     id="ip-select"
                 {
-                    @for ip in ips {
-                        @if ip == selected_ip {
+                    @for ip in &ips {
+                        @if ip == &selected_ip {
                             option value=(ip) selected { (ip) }
                         } @else {
                             option value=(ip) { (ip) }
@@ -140,17 +205,21 @@ async fn rules(templ: Template) -> Markup {
 
             script type="text/javascript" {
                 (PreEscaped(r#"
-                document.getElementById('ip-select').addEventListener('change', function() {
+                document.getElementById('ip-select').addEventListener('change', async function() {
                     var selectedIp = this.value;
+                    await fetch('/api/ips/selected', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ip: selectedIp })
+                    });
                     var statusSpan = document.getElementById('status');
                     statusSpan.setAttribute('hx-get', 'http://' + selectedIp + '/firewall/state');
-                    // Forzar una solicitud HTMX para actualizar el estado
                     htmx.trigger(statusSpan, 'refresh');
                 });
                 "#))
             }
 
-            table .table-auto .text-left .border-separate   {
+            table .table-auto .text-left .border-separate {
                 thead {
                     tr {
                         th .pl-8 { "ID" }
@@ -171,7 +240,7 @@ async fn rules(templ: Template) -> Markup {
                                 (Ref("View", &format!("/firewall/rules/{}", rule.id)))
                                 button
                                     .text-sm
-                                    hx-delete={ "http://127.0.0.1:9988/firewall/rules/" (rule.id) }
+                                    hx-delete={ "http://" (selected_ip) "/firewall/rules/" (rule.id) }
                                     hx-target="closest tr"
                                 {
                                     "Delete"
