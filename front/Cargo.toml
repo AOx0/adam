@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rand = "0.8.5"
 axum = "0.7.6"
 reqwest = "0.12.7"
 strum = { version = "0.26.3", features = ["derive"] }

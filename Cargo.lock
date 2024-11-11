@@ -830,6 +830,7 @@ dependencies = [
  "front-components",
  "maud",
  "message",
+ "rand",
  "reqwest",
  "serde_json",
  "strum",

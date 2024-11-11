@@ -1,6 +1,7 @@
 use axum::{extract::Path, routing::*, Router};
 use front_components::Ref;
 use maud::{html, Markup, PreEscaped};
+use rand::RngCore;
 use template::Template;
 use tokio::net::TcpListener;
 
@@ -35,21 +36,30 @@ async fn not_found(templ: Template) -> Markup {
     })
 }
 
-async fn firewall_events(templ: Template) -> Markup {
-    templ.render(html! {
+#[allow(non_snake_case)]
+fn FirewallLog() -> Markup {
+    let mut rng = rand::thread_rng();
+    let id = rng.next_u64();
+    let id = format!("{id:0>21}");
+
+    html! {
         script {
-            (PreEscaped("
+            (PreEscaped(format!("
             const ws = new WebSocket('ws://localhost:9988/firewall/events/ws');
-            ws.onmessage = (event) => {
-                const logDiv = document.getElementById('event-log');
+            ws.onmessage = (event) => {{
+                const logDiv = document.getElementById('{id}');
                 const newEvent = document.createElement('p');
                 newEvent.textContent = event.data;
                 logDiv.appendChild(newEvent);
-            };
-            "))
+            }};
+            ")))
         }
-        div #event-log {}
-    })
+        div #(id) {}
+    }
+}
+
+async fn firewall_events(templ: Template) -> Markup {
+    templ.render(html! { (FirewallLog()) })
 }
 
 async fn home(templ: Template) -> Markup {
