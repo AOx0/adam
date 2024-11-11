@@ -15,6 +15,7 @@ pub struct Template {
     mode: ContentMode,
 }
 
+#[allow(dead_code)]
 impl Template {
     #[must_use]
     pub fn mode(&self) -> ContentMode {

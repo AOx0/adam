@@ -6,6 +6,7 @@ pub enum Htmx {
     Disabled,
 }
 
+#[allow(dead_code)]
 impl Htmx {
     #[inline(always)]
     pub fn enabled(&self) -> bool {
