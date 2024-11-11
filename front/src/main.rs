@@ -15,11 +15,24 @@ async fn main() {
 
     let router = Router::new()
         .route("/", get(home))
-        .nest("/firewall", firewall_router);
+        .nest("/firewall", firewall_router)
+        .fallback(not_found);
 
     let listener = TcpListener::bind("[::]:8880").await.unwrap();
 
     axum::serve(listener, router).await.unwrap();
+}
+
+async fn not_found(templ: Template) -> Markup {
+    templ.render(html! {
+        div .flex .items-center .mt-20 .justify-center {
+            div .text-center {
+                h1 .text-6xl .font-bold .text-gray-800 { "404" }
+                p .text-2xl .text-gray-600 { "Page Not Found" }
+                p .mt-4 .text-gray-500 { "Sorry, the page you are looking for does not exist." }
+            }
+        }
+    })
 }
 
 async fn firewall_events(templ: Template) -> Markup {
