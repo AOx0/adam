@@ -84,7 +84,7 @@ pub struct StoredRuleDecoded {
 
 #[cfg(feature = "serde")]
 #[cfg(feature = "chrono")]
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StoredEventDecoded {

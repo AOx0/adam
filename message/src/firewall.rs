@@ -1,3 +1,4 @@
+use firewall_common::StoredEventDecoded;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -12,6 +13,13 @@ pub enum Response {
     Status(Status),
     RuleChange(RuleChange),
     Events(Vec<firewall_common::StoredEventDecoded>),
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub enum Log {
+    Event(StoredEventDecoded),
 }
 
 #[derive(Debug, Serialize, Deserialize)]

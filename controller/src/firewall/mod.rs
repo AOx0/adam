@@ -8,8 +8,8 @@ use futures::{SinkExt, StreamExt};
 use maud::Markup;
 use message::{
     async_bincode::{tokio::AsyncBincodeStream, AsyncDestination},
-    firewall::{self, Status},
-    firewall_common::{Event, StoredEventDecoded, StoredRuleDecoded},
+    firewall::{self, Log, Status},
+    firewall_common::{StoredEventDecoded, StoredRuleDecoded},
     EventQuery, Message,
 };
 use tokio::net::UnixStream;
@@ -102,10 +102,10 @@ pub async fn event_dispatcher(mut socket: WebSocket) {
     let uds = UnixStream::connect("/run/adam/firewall_events")
         .await
         .unwrap();
-    let mut uds: AsyncBincodeReader<UnixStream, Event> = AsyncBincodeReader::from(uds);
+    let mut uds: AsyncBincodeReader<UnixStream, Log> = AsyncBincodeReader::from(uds);
 
     loop {
-        let Ok(event): Result<Event, _> = futures::StreamExt::next(&mut uds).await.unwrap() else {
+        let Ok(event): Result<Log, _> = futures::StreamExt::next(&mut uds).await.unwrap() else {
             break; // If it fails it may be that the firewall stopped
         };
 

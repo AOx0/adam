@@ -9,6 +9,7 @@ mod template;
 #[tokio::main]
 async fn main() {
     let firewall_router = Router::new()
+        .route("/events", get(firewall_events))
         .route("/rules", get(rules))
         .route("/rules/:id", get(rule));
 
@@ -19,6 +20,23 @@ async fn main() {
     let listener = TcpListener::bind("[::]:8880").await.unwrap();
 
     axum::serve(listener, router).await.unwrap();
+}
+
+async fn firewall_events(templ: Template) -> Markup {
+    templ.render(html! {
+        script {
+            (PreEscaped("
+            const ws = new WebSocket('ws://localhost:9988/firewall/events/ws');
+            ws.onmessage = (event) => {
+                const logDiv = document.getElementById('event-log');
+                const newEvent = document.createElement('p');
+                newEvent.textContent = event.data;
+                logDiv.appendChild(newEvent);
+            };
+            "))
+        }
+        div #event-log {}
+    })
 }
 
 async fn home(templ: Template) -> Markup {
@@ -66,7 +84,7 @@ async fn rules(templ: Template) -> Markup {
             h1 .text-xl .font-bold { "Firewall" }
 
             p { "Status: " span hx-get="http://127.0.0.1:9988/firewall/state" hx-trigger="load, every 30s" {} }
-            
+
             table .table-auto .text-left .border-separate   {
                 thead {
                     tr {

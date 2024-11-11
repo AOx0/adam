@@ -98,9 +98,10 @@ fn Template(title: &str, mode: ContentMode, content: Markup) -> Markup {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" {}
-                script src="https://unpkg.com/htmx.org@1.9.9" {}
+                script src="https://unpkg.com/htmx.org" {}
                 script src="https://unpkg.com/htmx.org/dist/ext/response-targets.js" {}
                 script src="https://unpkg.com/htmx.org/dist/ext/head-support.js" {}
+                script src="https://unpkg.com/htmx.org/dist/ext/ws.js" {}
                 script src="https://cdn.tailwindcss.com" {}
                 script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer {}
                 script {
