@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use axum::http::request::Parts;
 use axum::{async_trait, extract::FromRequestParts};
 use front_components::Ref;
@@ -12,10 +14,26 @@ pub enum ContentMode {
     Embedded,
 }
 
+impl Template {
+    pub async fn new(parts: &Parts, state: &AppState) -> Self {
+        Template {
+            ips: state.registered_ips.read().await.clone(),
+            selected_ip: *state.selected_ip.read().await,
+            title: format!("ADAM - {}", parts.uri.path()),
+            mode: if parts.headers.get("HX-Request").is_some() {
+                ContentMode::Embedded
+            } else {
+                ContentMode::Full
+            },
+        }
+    }
+}
+
 pub struct Template {
     title: String,
     mode: ContentMode,
-    state: AppState,
+    ips: Vec<SocketAddr>,
+    selected_ip: Option<SocketAddr>,
 }
 
 #[allow(dead_code)]
@@ -33,7 +51,14 @@ impl Template {
     pub async fn render(self, content: Markup) -> Markup {
         match self.mode {
             ContentMode::Full => {
-                Template(&self.title, ContentMode::Full, content, self.state).await
+                Template(
+                    &self.title,
+                    ContentMode::Full,
+                    content,
+                    self.ips,
+                    self.selected_ip,
+                )
+                .await
             }
             ContentMode::Embedded => {
                 html! {
@@ -55,21 +80,14 @@ impl FromRequestParts<AppState> for Template {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        Ok(Template {
-            state: state.clone(),
-            title: format!("ADAM - {}", parts.uri.path()),
-            mode: if parts.headers.get("HX-Request").is_some() {
-                ContentMode::Embedded
-            } else {
-                ContentMode::Full
-            },
-        })
+        Ok(Template::new(parts, state).await)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 enum Section {
     Home,
+    IPs,
     Firewall,
 }
 
@@ -77,7 +95,8 @@ impl Section {
     fn map_path(self) -> &'static str {
         match self {
             Self::Home => "/",
-            Self::Firewall => "/firewall",
+            Self::IPs => "/ips",
+            Self::Firewall => "/firewall/rules",
         }
     }
 }
@@ -93,16 +112,18 @@ impl maud::Render for Section {
 #[allow(clippy::too_many_lines)]
 #[allow(clippy::needless_pass_by_value)]
 #[allow(non_snake_case)]
-async fn Template(title: &str, mode: ContentMode, content: Markup, state: AppState) -> Markup {
+async fn Template(
+    title: &str,
+    mode: ContentMode,
+    content: Markup,
+    ips: Vec<SocketAddr>,
+    selected_ip: Option<SocketAddr>,
+) -> Markup {
     if let ContentMode::Embedded = mode {
         return html! {
             (content)
         };
     }
-
-    // Get IP list and selected IP from the global AppState
-    let registered_ips = state.registered_ips.read().await.clone();
-    let selected_ip = state.selected_ip.read().await.clone();
 
     html! {
         (DOCTYPE)
@@ -183,18 +204,20 @@ async fn Template(title: &str, mode: ContentMode, content: Markup, state: AppSta
                     }
 
                     // IP Selector Dropdown
-                    div.flex.flex-row.items-center."space-x-4" {
-                        form {
-                            label for="ip-select" { "Select IP: " }
-                            select
-                                name="ip"
-                                id="ip-select"
-                            {
-                                @for ip in &registered_ips {
-                                    @if ip == &selected_ip {
-                                        option value=(ip) selected { (ip) }
-                                    } @else {
-                                        option value=(ip) { (ip) }
+                    @if let Some(selected_ip) = selected_ip {
+                        div.flex.flex-row.items-center."space-x-4" {
+                            form {
+                                label for="ip-select" { "Select IP: " }
+                                select
+                                    name="ip"
+                                    id="ip-select"
+                                {
+                                    @for ip in &ips {
+                                        @if ip == &selected_ip {
+                                            option value=(ip) selected { (ip) }
+                                        } @else {
+                                            option value=(ip) { (ip) }
+                                        }
                                     }
                                 }
                             }
@@ -207,18 +230,20 @@ async fn Template(title: &str, mode: ContentMode, content: Markup, state: AppSta
                 (Footer())
             }
 
-            script type="text/javascript" {
-                (PreEscaped(r#"
-                document.getElementById('ip-select').addEventListener('change', async function() {
-                    const selectedIp = this.value;
-                    await fetch('/api/ips/selected', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ip: selectedIp })
+            @if selected_ip.is_some() {
+                script type="text/javascript" {
+                    (PreEscaped(r#"
+                    document.getElementById('ip-select').addEventListener('change', async function() {
+                        const selectedIp = this.value;
+                        await fetch('/api/ips/selected', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ip: selectedIp })
+                        });
+                        // Optionally, refresh content that depends on the selected IP ? 
                     });
-                    // Optionally, refresh content that depends on the selected IP ? 
-                });
-                "#))
+                    "#))
+                }
             }
         }
     }
