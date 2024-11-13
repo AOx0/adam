@@ -1,11 +1,10 @@
 use axum::http::request::Parts;
 use axum::{async_trait, extract::FromRequestParts};
 use front_components::Ref;
-use maud::{html, Markup, DOCTYPE};
+use maud::{html, Markup, PreEscaped, DOCTYPE};
 use strum::{EnumIter, IntoEnumIterator};
 
-use axum::extract::State;
-use std::sync::Arc;
+use crate::AppState;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ContentMode {
@@ -16,6 +15,7 @@ pub enum ContentMode {
 pub struct Template {
     title: String,
     mode: ContentMode,
+    state: AppState,
 }
 
 #[allow(dead_code)]
@@ -30,9 +30,11 @@ impl Template {
     }
 
     #[must_use]
-    pub fn render(self, content: Markup) -> Markup {
+    pub async fn render(self, content: Markup) -> Markup {
         match self.mode {
-            ContentMode::Full => Template(&self.title, ContentMode::Full, content),
+            ContentMode::Full => {
+                Template(&self.title, ContentMode::Full, content, self.state).await
+            }
             ContentMode::Embedded => {
                 html! {
                     head {
@@ -46,11 +48,15 @@ impl Template {
 }
 
 #[async_trait]
-impl FromRequestParts<()> for Template {
+impl FromRequestParts<AppState> for Template {
     type Rejection = ();
 
-    async fn from_request_parts(parts: &mut Parts, _state: &()) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
         Ok(Template {
+            state: state.clone(),
             title: format!("ADAM - {}", parts.uri.path()),
             mode: if parts.headers.get("HX-Request").is_some() {
                 ContentMode::Embedded
@@ -87,7 +93,7 @@ impl maud::Render for Section {
 #[allow(clippy::too_many_lines)]
 #[allow(clippy::needless_pass_by_value)]
 #[allow(non_snake_case)]
-fn Template(title: &str, mode: ContentMode, content: Markup, state: Arc<AppState>) -> Markup {
+async fn Template(title: &str, mode: ContentMode, content: Markup, state: AppState) -> Markup {
     if let ContentMode::Embedded = mode {
         return html! {
             (content)
