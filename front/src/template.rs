@@ -1,8 +1,12 @@
+use std::net::SocketAddr;
+
 use axum::http::request::Parts;
 use axum::{async_trait, extract::FromRequestParts};
 use front_components::Ref;
-use maud::{html, Markup, DOCTYPE};
+use maud::{html, Markup, PreEscaped, DOCTYPE};
 use strum::{EnumIter, IntoEnumIterator};
+
+use crate::{AppState, Padded};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ContentMode {
@@ -10,9 +14,26 @@ pub enum ContentMode {
     Embedded,
 }
 
+impl Template {
+    pub async fn new(parts: &Parts, state: &AppState) -> Self {
+        Template {
+            ips: state.registered_ips.read().await.clone(),
+            selected_ip: *state.selected_ip.read().await,
+            title: format!("ADAM - {}", parts.uri.path()),
+            mode: if parts.headers.get("HX-Request").is_some() {
+                ContentMode::Embedded
+            } else {
+                ContentMode::Full
+            },
+        }
+    }
+}
+
 pub struct Template {
     title: String,
     mode: ContentMode,
+    ips: Vec<SocketAddr>,
+    selected_ip: Option<SocketAddr>,
 }
 
 #[allow(dead_code)]
@@ -27,9 +48,18 @@ impl Template {
     }
 
     #[must_use]
-    pub fn render(self, content: Markup) -> Markup {
+    pub async fn render(self, content: Markup) -> Markup {
         match self.mode {
-            ContentMode::Full => Template(&self.title, ContentMode::Full, content),
+            ContentMode::Full => {
+                Template(
+                    &self.title,
+                    ContentMode::Full,
+                    content,
+                    self.ips,
+                    self.selected_ip,
+                )
+                .await
+            }
             ContentMode::Embedded => {
                 html! {
                     head {
@@ -40,27 +70,29 @@ impl Template {
             }
         }
     }
+
+    #[must_use]
+    pub async fn render_padded(self, content: Markup) -> Markup {
+        self.render(Padded(content)).await
+    }
 }
 
 #[async_trait]
-impl FromRequestParts<()> for Template {
+impl FromRequestParts<AppState> for Template {
     type Rejection = ();
 
-    async fn from_request_parts(parts: &mut Parts, _state: &()) -> Result<Self, Self::Rejection> {
-        Ok(Template {
-            title: format!("ADAM - {}", parts.uri.path()),
-            mode: if parts.headers.get("HX-Request").is_some() {
-                ContentMode::Embedded
-            } else {
-                ContentMode::Full
-            },
-        })
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        Ok(Template::new(parts, state).await)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
 enum Section {
     Home,
+    IPs,
     Firewall,
 }
 
@@ -68,7 +100,8 @@ impl Section {
     fn map_path(self) -> &'static str {
         match self {
             Self::Home => "/",
-            Self::Firewall => "/firewall",
+            Self::IPs => "/ips",
+            Self::Firewall => "/firewall/rules",
         }
     }
 }
@@ -84,7 +117,13 @@ impl maud::Render for Section {
 #[allow(clippy::too_many_lines)]
 #[allow(clippy::needless_pass_by_value)]
 #[allow(non_snake_case)]
-fn Template(title: &str, mode: ContentMode, content: Markup) -> Markup {
+async fn Template(
+    title: &str,
+    mode: ContentMode,
+    content: Markup,
+    ips: Vec<SocketAddr>,
+    selected_ip: Option<SocketAddr>,
+) -> Markup {
     if let ContentMode::Embedded = mode {
         return html! {
             (content)
@@ -100,9 +139,6 @@ fn Template(title: &str, mode: ContentMode, content: Markup) -> Markup {
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" {}
                 script src="https://unpkg.com/htmx.org" {}
-                script src="https://unpkg.com/htmx.org/dist/ext/response-targets.js" {}
-                script src="https://unpkg.com/htmx.org/dist/ext/head-support.js" {}
-                script src="https://unpkg.com/htmx.org/dist/ext/ws.js" {}
                 script src="https://cdn.tailwindcss.com" {}
                 script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer {}
                 script {
@@ -169,20 +205,51 @@ fn Template(title: &str, mode: ContentMode, content: Markup) -> Markup {
                         }
                     }
 
-                    div
-                        .flex.flex-row.items-center."space-x-4"
-                        x-data = "{ open: false }"
-                    {}
+                    // IP Selector Dropdown
+                    @if let Some(selected_ip) = selected_ip {
+                        div.flex.flex-row.items-center."space-x-4" {
+                            form {
+                                label for="ip-select" { "Select IP: " }
+                                select
+                                    name="ip"
+                                    id="ip-select"
+                                {
+                                    @for ip in &ips {
+                                        @if ip == &selected_ip {
+                                            option value=(ip) selected { (ip) }
+                                        } @else {
+                                            option value=(ip) { (ip) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 main #main { (content) }
 
                 (Footer())
             }
+
+            @if selected_ip.is_some() {
+                script type="text/javascript" {
+                    (PreEscaped(r#"
+                    document.getElementById('ip-select').addEventListener('change', async function() {
+                        const selectedIp = this.value;
+                        await fetch('/api/ips/selected', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ ip: selectedIp })
+                        });
+                        // Optionally, refresh content that depends on the selected IP ?
+                    });
+                    "#))
+                }
+            }
         }
     }
 }
-
 #[allow(non_snake_case)]
 fn Footer() -> Markup {
     html! {

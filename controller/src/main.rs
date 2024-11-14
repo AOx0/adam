@@ -1,8 +1,14 @@
+use std::{
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+};
+
 pub use axum::{extract::State, routing::post, Router};
 use axum::{middleware::Next, response::Response};
+use clap::Parser;
 use deadpool::managed::Pool;
 use tokio::net::TcpListener;
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::{Any, CorsLayer};
 
 mod firewall;
 mod htmx;
@@ -30,17 +36,30 @@ pub async fn insert_headers(req: axum::extract::Request, next: Next) -> Response
     response
 }
 
+#[derive(Debug, Parser)]
+struct Args {
+    #[clap(long, short, alias = "addr")]
+    address: Option<IpAddr>,
+    #[clap(long, short)]
+    port: Option<u16>,
+}
+
 #[tokio::main]
 async fn main() {
+    let Args { address, port } = Args::parse();
+    let address = address.unwrap_or(IpAddr::from_str("::").expect("Should not fail"));
+    let port = port.unwrap_or(9988);
+
+    let socket = SocketAddr::new(address, port);
+    println!("Binding to {socket:?}");
+
     let state = AppState::new();
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([axum::http::Method::POST, axum::http::Method::DELETE])
-        .allow_headers([
-            axum::http::HeaderName::from_static("hx-request"),
-            axum::http::HeaderName::from_static("hx-current-url"),
-        ]);
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .allow_private_network(true);
 
     let router = Router::new()
         .nest("/firewall", firewall::router())
@@ -48,6 +67,6 @@ async fn main() {
         .layer(cors)
         .with_state(state);
 
-    let listener = TcpListener::bind("[::]:9988").await.unwrap();
+    let listener = TcpListener::bind(socket).await.unwrap();
     axum::serve(listener, router).await.unwrap()
 }
