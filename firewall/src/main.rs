@@ -363,11 +363,7 @@ async fn emit_to_suscriber(
             if let State::Terminated = *rx.borrow_and_update() {
                 break;
             }
-        },
-        else => {
-            log::warn!("All channels closed, terminating loop");
-            break;
-            }
+        }
         }
     }
 }
