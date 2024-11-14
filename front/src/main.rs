@@ -35,13 +35,13 @@ async fn ips_home(templ: Template, State(state): State<AppState>) -> Markup {
     let ips = ips.as_slice();
 
     templ
-        .render(html! {
+        .render(Padded(html! {
             div {
                 @for ip in ips.iter().enumerate() {
                     p { (format!("{ip:?}")) }
                 }
             }
-        })
+        }))
         .await
 }
 
@@ -78,7 +78,7 @@ async fn add_ip_home(templ: Template) -> Markup {
                 input type="text" id="address" name="address" required;
 
                 label for="port" { "Port:" }
-                input type="number" id="port" name="port" required;
+                input type="number" id="port" name="port" value="9988" required;
 
                 button type="submit" { "Add IP" }
             }
