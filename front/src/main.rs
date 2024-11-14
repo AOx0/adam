@@ -1,10 +1,10 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Request, State},
     response::{IntoResponse, Redirect},
     routing::*,
     Form, Router,
 };
-use front_components::Ref;
+use front_components::*;
 use maud::{html, Markup, PreEscaped};
 use rand::RngCore;
 use serde::Deserialize;
@@ -36,9 +36,12 @@ async fn ips_home(templ: Template, State(state): State<AppState>) -> Markup {
 
     templ
         .render(Padded(html! {
-            div {
-                @for ip in ips.iter().enumerate() {
-                    p { (format!("{ip:?}")) }
+            div .flex .flex-col {
+                a .font-bold href="/ips/add" { "Add" }
+                div {
+                    @for ip in ips.iter().enumerate() {
+                        p { (format!("{ip:?}")) }
+                    }
                 }
             }
         }))
@@ -69,20 +72,35 @@ async fn add_ip(State(s): State<AppState>, Form(ip): Form<AddIp>) -> impl IntoRe
     Redirect::to("/ips").into_response()
 }
 
-async fn add_ip_home(templ: Template) -> Markup {
+async fn add_ip_home(templ: Template, req: Request) -> Markup {
+    let err_refered = req
+        .headers()
+        .get("HX-Request")
+        .is_some_and(|v| v.to_str().is_ok_and(|v| v == "true"));
+
     templ
-        .render(Padded(html! {
-            p { "Add" }
-            form method="post" action="/ips/add" {
-                label for="address" { "IP Address:" }
-                input type="text" id="address" name="address" required;
-
-                label for="port" { "Port:" }
-                input type="number" id="port" name="port" value="9988" required;
-
-                button type="submit" { "Add IP" }
+        .render(html! {
+            @if err_refered {
+                (Error("No IP address selected."))
             }
-        }))
+            (Padded(html! {
+                form .flex .flex-col ."w-1/2" .space-y-2 method="post" action="/ips/add" {
+                    div {
+                        label for="address" { "IP Address:" }
+                        input .ml-2 type="text" id="address" name="address" required;
+                    }
+
+                    div {
+                        label for="port" { "Port:" }
+                        input .ml-2 type="number" id="port" name="port" value="9988" required;
+                    }
+
+                    div {
+                        button .font-bold type="submit" { "Add IP" }
+                    }
+                }
+            }))
+        })
         .await
 }
 

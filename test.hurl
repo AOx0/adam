@@ -25,7 +25,7 @@ POST http://localhost:9988/firewall/rules
 Content-Type: application/json
 {
     "name": "Block 8080",
-    "description": "Block access to port 8008",
+    "description": "Block access to port 8080",
     "rule": {
         "action":"drop",
         "matches":{ "port": 8080 },

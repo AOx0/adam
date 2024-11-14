@@ -10,7 +10,7 @@ impl FromRequestParts<AppState> for Selected {
 
     async fn from_request_parts(_: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         Ok(Selected(
-            (*state.inner.selected_ip.read().await).ok_or(Redirect::to("/ips"))?,
+            (*state.inner.selected_ip.read().await).ok_or(Redirect::to("/ips/add"))?,
         ))
     }
 }
