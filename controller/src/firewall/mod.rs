@@ -106,9 +106,17 @@ pub async fn event_dispatcher(mut socket: WebSocket) {
     let mut uds: AsyncBincodeReader<UnixStream, LogKind> = AsyncBincodeReader::from(uds);
 
     loop {
-        let Ok(event): Result<LogKind, _> = futures::StreamExt::next(&mut uds).await.unwrap()
-        else {
-            break; // If it fails it may be that the firewall stopped
+        let event = match futures::StreamExt::next(&mut uds).await {
+            Some(Ok(event)) => event,
+            Some(Err(e)) => {
+                // Convert error to string to check if it's an EOF error
+                let err_str = e.to_string();
+                if err_str.contains("UnexpectedEof") || err_str.contains("connection reset") {
+                    break; // Exit cleanly on EOF or connection reset
+                }
+                panic!("Fatal error in event stream: {}", e);
+            }
+            None => break, // Stream ended
         };
 
         let event = Log {
@@ -116,14 +124,14 @@ pub async fn event_dispatcher(mut socket: WebSocket) {
             kind: event,
         };
 
-        let Ok(_) = socket
+        if let Err(e) = socket
             .send(axum::extract::ws::Message::Text(
                 serde_json::to_string(&event).unwrap(),
             ))
             .await
-        else {
-            break; // We will just drop de connection if it fails
-        };
+        {
+            panic!("WebSocket send error: {}", e);
+        }
     }
 }
 
