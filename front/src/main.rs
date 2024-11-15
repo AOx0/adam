@@ -23,10 +23,11 @@ mod sip;
 mod template;
 
 // Endpoint to delete an IP
-async fn delete_ip(State(state): State<AppState>, Path(ip): Path<SocketAddr>) -> impl IntoResponse {
-    let mut ips = state.registered_ips.write().await;
-    ips.retain(|x| x != &ip);
-    "IP removed".into_response()
+async fn delete_ip(State(state): State<AppState>, Path(id): Path<usize>) {
+    let mut ips = state.inner.registered_ips.write().await;
+    if id < ips.len() {
+        ips.remove(id);
+    }
 }
 
 // Endpoint to get all IPs
@@ -81,7 +82,7 @@ async fn add_ip_home(templ: Template, req: Request) -> Markup {
     templ
         .render(html! {
             @if err_refered {
-                (Error("No IP address selected."))
+                (Error("You have been redirected since no IP address has been added/selected."))
             }
             (Padded(html! {
                 form .flex .flex-col ."w-1/2" .space-y-2 method="post" action="/ips/add" {
@@ -140,7 +141,7 @@ async fn main() {
     let ip_router = Router::new()
         .route("/", get(ips_home))
         .route("/add", get(add_ip_home).post(add_ip))
-        .route("/:ip", delete(delete_ip));
+        .route("/:id", delete(delete_ip));
 
     let router = Router::new()
         .route("/", get(home))
