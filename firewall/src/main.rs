@@ -20,11 +20,13 @@ use diesel_async::sync_connection_wrapper::SyncConnectionWrapper;
 use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 use dotenv::dotenv;
 use firewall_common::{processor, Event, Rule, StoredEventDecoded, StoredRuleDecoded, MAX_RULES};
+use futures::SinkExt;
 use log::{debug, info, warn};
 use message::async_bincode::tokio::AsyncBincodeStream;
 use message::firewall::*;
 use message::Message;
 use serde::{Deserialize, Serialize};
+use std::io::ErrorKind;
 use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
 use tokio::net::unix::SocketAddr;
 use tokio::net::{UnixListener, UnixStream};
@@ -338,22 +340,30 @@ async fn emit_to_suscriber(
 
     let mut s: AsyncBincodeWriter<UnixStream, LogKind, message::async_bincode::AsyncDestination> =
         AsyncBincodeWriter::from(s).for_async();
+
     loop {
         select! {
-            Ok(event) = erx.recv() => {
-                log::info!("Relaying event");
-                if futures::SinkExt::send(&mut s, event).await.is_err() {
-                    break;
-                };
-            }
-            _ = rx.changed() => {
-                if let State::Terminated = *rx.borrow_and_update(){
-                    break;
+        Ok(event) = erx.recv() => {
+            log::info!("Relaying event");
+            match SinkExt::send(&mut s, event).await {
+                Ok(_) => continue,
+                Err(e) => match *e {
+                    bincode::ErrorKind::Io(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
+                        log::info!("Channel closed normally (EOF)");
+                        break;
+                    }
+                    _ => {
+                        log::error!("Fatal error while sending event: {}", e);
+                        panic!("Fatal error in event relay: {}", e);
+                    }
                 }
-            },
-            else => {
+            }
+        },
+        _ = rx.changed() => {
+            if let State::Terminated = *rx.borrow_and_update() {
                 break;
             }
+        }
         }
     }
 }
