@@ -205,8 +205,75 @@ async fn firewall_events(_: State<AppState>, Selected(ip): Selected, templ: Temp
 async fn home(templ: Template) -> Markup {
     templ
         .render(Padded(html! {
-            "Hi"
-        }))
+            div.space-5.m-5 style="font-size:80px; font-weight:bold" {
+    h1.txt-xl {
+        span style="font-weight:900" { "A" }
+        "gent-based "
+        span style="font-weight:900" { "D" }
+        "evice "
+        span style="font-weight:900" { "A" }
+        "udit "
+        span style="font-weight:900" { "M" }
+        "onitor"
+    }
+}
+                              div.grafana-stack.p-8  {
+            // Header - full width
+            div.text-center.mb-8 {
+                h1.text-2xl.text-white { "Understand your Resources and Optimize" }
+                h1.text-2xl.text-white { "using some, or all pluggins" }
+            }
+
+            // Content wrapper with grid
+            div.flex style="gap: 2rem" {
+                // Left column - about 25% width
+                div.flex-col style="gap: 1rem; width: 25%" {
+                    // Tools box
+                    div.rounded style="background-color: #2E2E2B; padding: 1rem; text-align: center;" {
+                        h2.text-white { "Your tools / data" }
+                        // Grid for icons would go here
+                    }
+
+                    // Environment box
+                    div.rounded style="background-color: #2E2E2B; padding: 1rem; text-align: center;" {
+                        h2.text-white { "Your environment" }
+                        p.text-gray-300 { "Applications and infrastructure" }
+                    }
+                }
+
+                // Right column - about 75% width
+                div.flex-col style="gap: 1rem; width: 75%" {
+                    // Visualization - full width
+                    div.rounded style="background-color: #9090A0; padding: 1rem; text-align: center;" {
+                        h2 { "Visualization" }
+                    }
+
+                    // Three equal boxes row
+                    div.grid style="grid-template-columns: repeat(3, 1fr); gap: 1rem" {
+                        div.rounded style="background-color: #9B7EDE; padding: 1rem; text-align: center;" {
+                            h3 { "Testing" }
+                        }
+                        div.rounded style="background-color: #5B9BD5; padding: 1rem; text-align: center;" {
+                            h3 { "Observability solutions" }
+                        }
+                        div.rounded style="background-color: #68B37E; padding: 1rem; text-align: center;" {
+                            h3 { "Incident response management" }
+                        }
+                    }
+
+                    // Key capabilities - full width
+                    div.rounded style="background-color: #FF7F50; padding: 1rem; text-align: center;" {
+                        h3 { "Key capabilities" }
+                    }
+
+                    // Building blocks - full width
+                    div.rounded style="background-color: #FFB366; padding: 1rem; text-align: center;" {
+                        h3 { "Building blocks: telemetry databases (LGTM+)" }
+                    }
+                }
+            }
+        }
+                                            }))
         .await
 }
 
