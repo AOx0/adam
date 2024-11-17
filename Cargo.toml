@@ -12,3 +12,5 @@ schemars = { version = "0.8.21" }
 deadpool = "0.12.1"
 maud = { version = "0.26.0", features = ["axum"] }
 chrono = { version = "0.4.38", features = ["serde"] }
+env_logger = "0.11.5"
+log = "0.4.22"

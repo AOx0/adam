@@ -14,6 +14,8 @@ deadpool.workspace = true
 futures.workspace = true
 maud.workspace = true
 chrono.workspace = true
+log.workspace = true
+env_logger.workspace = true
 
 message.path = "../message"
 front-components.path = "../front-components"

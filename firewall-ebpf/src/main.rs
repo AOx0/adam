@@ -10,7 +10,7 @@ use aya_ebpf::{
     maps::{Array, ProgramArray, RingBuf},
     programs::XdpContext,
 };
-use aya_log_ebpf::{error, info};
+use aya_log_ebpf::error;
 
 use firewall_common::{processor, Action, Direction, Event, Match, Rule, MAX_RULES};
 use netp::{

@@ -7,6 +7,7 @@ pub use axum::{extract::State, routing::post, Router};
 use axum::{middleware::Next, response::Response};
 use clap::Parser;
 use deadpool::managed::Pool;
+use log::info;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -30,7 +31,7 @@ impl AppState {
 
 #[allow(clippy::let_and_return, unused_mut)]
 pub async fn insert_headers(req: axum::extract::Request, next: Next) -> Response {
-    println!("Request: {req:?}");
+    info!("{} {}", req.method(), req.uri());
     let mut response = next.run(req).await;
 
     response
@@ -46,12 +47,14 @@ struct Args {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let Args { address, port } = Args::parse();
     let address = address.unwrap_or(IpAddr::from_str("::").expect("Should not fail"));
     let port = port.unwrap_or(9988);
 
     let socket = SocketAddr::new(address, port);
-    println!("Binding to {socket:?}");
+    info!("Binding to {socket:?}");
 
     let state = AppState::new();
 

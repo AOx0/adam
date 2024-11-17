@@ -12,10 +12,10 @@ run-firewall iface='lo':
     RUST_LOG=info cargo xtask run firewall --release -- -i {{iface}}
 
 run-controller:
-    cargo build --release && sudo ./target/release/controller
+    cargo build --release && sudo RUST_LOG=info ./target/release/controller
 
 run-front:
-    cargo run --bin front
+    RUST_LOG=info cargo run --bin front
     
 run-front-watch:
-    cargo watch -cqs "cargo run --bin front"
+    cargo watch -cqs "RUST_LOG=info cargo run --bin front"

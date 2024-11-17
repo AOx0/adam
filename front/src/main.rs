@@ -5,6 +5,7 @@ use axum::{
     Form, Router,
 };
 use front_components::*;
+use log::info;
 use maud::{html, Markup, PreEscaped};
 use rand::RngCore;
 use serde::Deserialize;
@@ -126,6 +127,8 @@ struct InnerState {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let state = AppState {
         inner: Arc::new(InnerState {
             registered_ips: RwLock::new(vec![]),
@@ -149,6 +152,10 @@ async fn main() {
         .nest("/ips", ip_router)
         .fallback(not_found)
         .with_state(state);
+
+    let uri = "http://[::]:8880".to_string();
+    let link = terminal_link::Link::new(&uri, &uri);
+    info!("Available on {link}");
 
     let listener = TcpListener::bind("[::]:8880").await.unwrap();
     axum::serve(listener, router).await.unwrap();
