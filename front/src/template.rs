@@ -214,11 +214,12 @@ async fn Template(
                                     id="ip-select"
                                 {
                                     @for ip in &ips {
+                                        @let id = ip.id.id.to_string();
                                         @if ip == selected_ip {
-                                            option value=(ip.id.as_ref().unwrap().id.to_string()) selected
+                                            option value=(id) selected
                                             { (ip.name) " (" (ip.socket) ")" }
                                         } @else {
-                                            option value=(ip.id.as_ref().unwrap().id.to_string())
+                                            option value=(id)
                                             { (ip.name) " (" (ip.socket) ")" }
                                         }
                                     }

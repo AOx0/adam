@@ -24,7 +24,7 @@ struct AddIp {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Ip {
-    pub id: Option<Thing>,
+    pub id: Thing,
     pub name: String,
     pub description: String,
     pub socket: SocketAddr,
@@ -52,9 +52,9 @@ async fn select_ip(State(s): State<AppState>, Path(id): Path<String>) {
     };
 
     let old = guard.take();
-    if let Some(Ip { id: Some(id_1), .. }) = old {
+    if let Some(Ip { id, .. }) = old {
         let _old: Option<Ip> = db
-            .update(("ips", id_1.id.to_string()))
+            .update(("ips", id.id.to_string()))
             .patch(PatchOp::replace("/selected", false))
             .await
             .unwrap();
@@ -113,15 +113,27 @@ async fn add_ip(State(s): State<AppState>, Form(ip): Form<AddIp>) -> impl IntoRe
     let socket = SocketAddr::new(ip_addr, ip.port);
     let db = s.surrealdb.get().await.unwrap();
 
-    let data = Ip {
-        id: None,
-        name: ip.name,
-        description: ip.description,
-        socket,
-        selected: s.selected_ip.read().await.is_none(),
-    };
+    #[derive(Serialize, Deserialize)]
+    pub struct IIp {
+        pub name: String,
+        pub description: String,
+        pub socket: SocketAddr,
+        pub selected: bool,
+    }
 
-    let _: Vec<Ip> = db.insert("ips").content(data.clone()).await.unwrap();
+    let regs: Vec<Ip> = db
+        .insert("ips")
+        .content(IIp {
+            name: ip.name,
+            description: ip.description,
+            socket,
+            selected: s.selected_ip.read().await.is_none(),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(regs.len(), 1);
+    let data = regs.into_iter().next().unwrap();
 
     if s.selected_ip.read().await.is_none() {
         *s.selected_ip.write().await = Some(data);
@@ -147,7 +159,7 @@ async fn ips_home(templ: Template, State(state): State<AppState>) -> Markup {
             div .flex .flex-col {
                 a .font-bold href="/ips/add" { "Add" }
                 div {
-                    @for ip in ips.iter().enumerate() {
+                    @for ip in ips.iter() {
                         p { (format!("{ip:?}")) }
                     }
                 }
