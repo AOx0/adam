@@ -21,6 +21,7 @@ use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 
 mod sip;
+mod surreal;
 mod template;
 
 // Endpoint to delete an IP
