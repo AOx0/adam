@@ -1,8 +1,7 @@
-use crate::AppState;
+use crate::{AppState, Ip};
 use axum::{async_trait, extract::FromRequestParts, http::request::Parts, response::Redirect};
-use std::net::SocketAddr;
 
-pub struct Selected(pub SocketAddr);
+pub struct Selected(pub Ip);
 
 #[async_trait]
 impl FromRequestParts<AppState> for Selected {
@@ -10,7 +9,7 @@ impl FromRequestParts<AppState> for Selected {
 
     async fn from_request_parts(_: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         Ok(Selected(
-            (*state.inner.selected_ip.read().await).ok_or(Redirect::to("/ips/add"))?,
+            (state.inner.selected_ip.read().await.clone()).ok_or(Redirect::to("/ips/add"))?,
         ))
     }
 }

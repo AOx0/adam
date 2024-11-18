@@ -15,8 +15,11 @@ serde_json.workspace = true
 serde.workspace = true
 log.workspace = true
 env_logger.workspace = true
+deadpool.workspace = true
 
 firewall-common = { path = "../firewall-common", features = ["serde"] }
 message.path = "../message"
 front-components.path = "../front-components"
 terminal-link = "0.1.0"
+surrealdb = { version = "2.0.4", default-features = false, features = ["kv-rocksdb"] }
+dirs = "5.0.1"

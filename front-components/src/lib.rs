@@ -17,6 +17,15 @@ pub fn Ref(title: impl maud::Render, href: &str) -> Markup {
 }
 
 #[allow(non_snake_case)]
+pub fn Padded(content: Markup) -> Markup {
+    html! {
+        div .space-5 .m-5 {
+            (content)
+        }
+    }
+}
+
+#[allow(non_snake_case)]
 pub fn Error(msg: &str) -> Markup {
     html! {
         div."w-full"."text-white"."bg-red-500" {
