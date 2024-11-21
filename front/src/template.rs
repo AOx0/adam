@@ -138,8 +138,9 @@ async fn Template(
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" {}
+                link href="/styles.css" rel="stylesheet";
                 script src="https://unpkg.com/htmx.org" {}
-                script src="https://cdn.tailwindcss.com" {}
+                script src="https://unpkg.com/htmx-ext-head-support/head-support.js" {}
                 script {
                     "
                         function toggleDarkMode() {
