@@ -1,12 +1,11 @@
-use std::net::SocketAddr;
-
 use axum::http::request::Parts;
 use axum::{async_trait, extract::FromRequestParts};
 use front_components::Ref;
+use log::info;
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 use strum::{EnumIter, IntoEnumIterator};
 
-use crate::{AppState, Padded};
+use crate::{AppState, Ip, Padded};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ContentMode {
@@ -17,8 +16,8 @@ pub enum ContentMode {
 impl Template {
     pub async fn new(parts: &Parts, state: &AppState) -> Self {
         Template {
-            ips: state.registered_ips.read().await.clone(),
-            selected_ip: *state.selected_ip.read().await,
+            ips: state.db.select("ips").await.unwrap(),
+            selected_ip: state.selected_ip.read().await.clone(),
             title: format!("ADAM - {}", parts.uri.path()),
             mode: if parts.headers.get("HX-Request").is_some() {
                 ContentMode::Embedded
@@ -32,8 +31,8 @@ impl Template {
 pub struct Template {
     title: String,
     mode: ContentMode,
-    ips: Vec<SocketAddr>,
-    selected_ip: Option<SocketAddr>,
+    ips: Vec<Ip>,
+    selected_ip: Option<Ip>,
 }
 
 #[allow(dead_code)]
@@ -121,8 +120,8 @@ async fn Template(
     title: &str,
     mode: ContentMode,
     content: Markup,
-    ips: Vec<SocketAddr>,
-    selected_ip: Option<SocketAddr>,
+    ips: Vec<Ip>,
+    selected_ip: Option<Ip>,
 ) -> Markup {
     if let ContentMode::Embedded = mode {
         return html! {
@@ -138,9 +137,9 @@ async fn Template(
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" {}
+                link href="/styles.css" rel="stylesheet";
                 script src="https://unpkg.com/htmx.org" {}
-                script src="https://cdn.tailwindcss.com" {}
-                script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer {}
+                script src="https://unpkg.com/htmx-ext-head-support/head-support.js" {}
                 script {
                     "
                         function toggleDarkMode() {
@@ -205,23 +204,40 @@ async fn Template(
                         }
                     }
 
-                    // IP Selector Dropdown
-                    @if let Some(selected_ip) = selected_ip {
-                        div.flex.flex-row.items-center."space-x-4" {
-                            form {
-                                label for="ip-select" { "Select IP: " }
-                                select
-                                    name="ip"
-                                    id="ip-select"
-                                {
-                                    @for ip in &ips {
-                                        @if ip == &selected_ip {
-                                            option value=(ip) selected { (ip) }
-                                        } @else {
-                                            option value=(ip) { (ip) }
+                    div .flex.flex-row.space-x-4 {
+                        @if let Some(selected_ip) = &selected_ip {
+                            div.flex.flex-row.items-center."space-x-4" {
+                                form {
+                                    label for="ip-select" { "Select IP: " }
+                                    select
+                                        ."dark:text-background"
+                                        .px-2
+                                        .ml-2
+                                        .rounded
+                                        name="ip"
+                                        id="ip-select"
+                                    {
+                                        @for ip in &ips {
+                                            @let id = ip.id.id.to_string();
+                                            @if ip == selected_ip {
+                                                option value=(id) selected
+                                                { (ip.name) " (" (ip.socket) ")" }
+                                            } @else {
+                                                option value=(id)
+                                                { (ip.name) " (" (ip.socket) ")" }
+                                            }
                                         }
                                     }
                                 }
+                            }
+                        }
+
+                        button x-on:click="isDark = toggleDarkMode()" {
+                            div."dark:hidden".block."hover:opacity-80".transition-opacity {
+                                (PreEscaped(include_str!("../static/sun.svg")))
+                            }
+                            div.hidden."dark:block"."hover:opacity-80".transition-opacity {
+                                (PreEscaped(include_str!("../static/moon.svg")))
                             }
                         }
                     }
@@ -232,17 +248,15 @@ async fn Template(
                 (Footer())
             }
 
-            @if selected_ip.is_some() {
+            @if selected_ip.as_ref().is_some() {
                 script type="text/javascript" {
                     (PreEscaped(r#"
                     document.getElementById('ip-select').addEventListener('change', async function() {
                         const selectedIp = this.value;
-                        await fetch('/api/ips/selected', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ ip: selectedIp })
+                        await fetch(`/ips/${selectedIp}`, {
+                            method: 'PATCH',
                         });
-                        // Optionally, refresh content that depends on the selected IP ?
+                        location.reload();
                     });
                     "#))
                 }

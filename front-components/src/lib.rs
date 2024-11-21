@@ -17,6 +17,15 @@ pub fn Ref(title: impl maud::Render, href: &str) -> Markup {
 }
 
 #[allow(non_snake_case)]
+pub fn Padded(content: Markup) -> Markup {
+    html! {
+        div .space-5 .m-5 {
+            (content)
+        }
+    }
+}
+
+#[allow(non_snake_case)]
 pub fn Error(msg: &str) -> Markup {
     html! {
         div."w-full"."text-white"."bg-red-500" {
@@ -63,12 +72,17 @@ pub fn rule_status(enabled: bool, id: u32) -> Markup {
         @let color = { if enabled { "lime" } else { "rose" } };
         @let text = { if enabled { "Enabled" } else { "Disabled" } };
 
+        // Trigger tailwindcss
+        // bg-rose-200 border-rose-800 text-rose-800
+        // bg-lime-200 border-lime-800 text-lime-800
+        // dark:bg-rose-500/10 dark:border-rose-500 dark:text-rose-500
+        // dark:bg-lime-500/10 dark:border-lime-500 dark:text-lime-500
         button
             hx-post={ "http://127.0.0.1:9988/firewall/rules/" (id) "/toggle" }
             hx-swap="outerHTML"
-            .{ "bg-"(color)"-200" }
-            .{ "border-"(color)"-800" }
-            .{ "text-"(color)"-800" }
+            .{ "bg-"(color)"-200" } .{ "dark:bg-"(color)"-500/10" }
+            .{ "border-"(color)"-800" } .{ "dark:border-"(color)"-500" }
+            .{ "text-"(color)"-800" } .{ "dark:text-"(color)"-500" }
             .border.rounded-full
             .px-2
             .text-sm
@@ -84,9 +98,9 @@ pub fn status(enabled: bool, toggle_url: &str) -> Markup {
         button
             hx-post=(toggle_url)
             hx-swap="outerHTML"
-            .{ "bg-"(color)"-200" }
-            .{ "border-"(color)"-800" }
-            .{ "text-"(color)"-800" }
+            .{ "bg-"(color)"-200" } .{ "dark:bg-"(color)"-500/10" }
+            .{ "border-"(color)"-800" } .{ "dark:border-"(color)"-500" }
+            .{ "text-"(color)"-800" } .{ "dark:text-"(color)"-500" }
             .border.rounded-full
             .px-2
             .text-sm
