@@ -1,21 +1,23 @@
+#![feature(let_chains)]
+
 use axum::middleware::Next;
 use axum::response::Response;
 use axum::{routing::*, Router};
-use deadpool::managed::Pool;
 use front_components::*;
 use ips::Ip;
 use log::info;
 use maud::{html, Markup};
 use std::{ops::Deref, sync::Arc};
-use surrealdb::engine::local::RocksDb;
+use surrealdb::engine::local::{Db, RocksDb};
+use surrealdb::Surreal;
 use template::Template;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
+use tower_http::services::ServeDir;
 
 mod firewall;
 mod ips;
 mod sip;
-mod surreal;
 mod template;
 
 impl Deref for AppState {
@@ -34,7 +36,7 @@ struct AppState {
 #[derive(Debug)]
 struct InnerState {
     selected_ip: RwLock<Option<Ip>>,
-    surrealdb: Pool<surreal::Manager>,
+    db: Surreal<Db>,
 }
 
 #[allow(clippy::let_and_return, unused_mut)]
@@ -52,10 +54,10 @@ async fn main() {
     let storage = dirs::data_local_dir().unwrap().join("adam");
     let storage = storage.as_path();
     std::fs::create_dir_all(storage).unwrap();
+    let db = surrealdb::Surreal::new::<RocksDb>(storage).await.unwrap();
+    db.use_ns("adam").use_db("adam").await.unwrap();
 
     let selected_ip = {
-        let db = surrealdb::Surreal::new::<RocksDb>(storage).await.unwrap();
-        db.use_ns("adam").use_db("adam").await.unwrap();
         let ips: Vec<Ip> = db.select("ips").await.unwrap();
         ips.into_iter().find(|ip| ip.selected)
     };
@@ -63,7 +65,7 @@ async fn main() {
     let state = AppState {
         inner: Arc::new(InnerState {
             selected_ip: RwLock::new(selected_ip),
-            surrealdb: surreal::Manager::new(storage.to_str().unwrap(), 50),
+            db,
         }),
     };
 
@@ -73,6 +75,7 @@ async fn main() {
         .nest("/ips", ips::router())
         .layer(axum::middleware::from_fn(insert_headers))
         .fallback(not_found)
+        .fallback_service(ServeDir::new("./front/static/"))
         .with_state(state);
 
     let uri = "http://[::]:8880".to_string();

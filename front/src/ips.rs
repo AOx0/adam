@@ -1,12 +1,14 @@
 use crate::{template::Template, AppState, Padded};
 use axum::{
     extract::{Path, Request, State},
-    response::{IntoResponse, Redirect},
+    http::HeaderValue,
+    response::{IntoResponse, Redirect, Response},
     routing::{delete, get},
     Form, Router,
 };
 use front_components::*;
-use maud::{html, Markup};
+use maud::{html, Markup, PreEscaped};
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{
     net::{IpAddr, SocketAddr},
@@ -38,29 +40,35 @@ pub fn router() -> Router<AppState> {
         .route("/:id", delete(delete_ip).patch(select_ip))
 }
 
-async fn select_ip(State(s): State<AppState>, Path(id): Path<String>) {
-    let db = s.surrealdb.get().await.unwrap();
+async fn select_ip(State(s): State<AppState>, Path(id): Path<String>) -> Response {
     let mut guard = s.selected_ip.write().await;
 
-    let Some(new): Option<Ip> = db
-        .update(("ips", &id))
-        .patch(PatchOp::replace("/selected", true))
-        .await
-        .unwrap()
+    let Some(new): Option<Ip> =
+        s.db.update(("ips", &id))
+            .patch(PatchOp::replace("/selected", true))
+            .await
+            .unwrap()
     else {
-        return;
+        return StatusCode::NOT_MODIFIED.into_response();
     };
 
-    let old = guard.take();
-    if let Some(Ip { id, .. }) = old {
-        let _old: Option<Ip> = db
-            .update(("ips", id.id.to_string()))
-            .patch(PatchOp::replace("/selected", false))
-            .await
-            .unwrap();
+    if let Some(Ip { id, .. }) = guard.as_ref()
+        && id != &new.id
+    {
+        let _: Option<Ip> =
+            s.db.update(("ips", id.id.to_string()))
+                .patch(PatchOp::replace("/selected", false))
+                .await
+                .unwrap();
     }
 
     *guard = Some(new);
+
+    let mut res = (StatusCode::OK).into_response();
+    res.headers_mut()
+        .insert("HX-Refresh", HeaderValue::from_static("true"));
+
+    res
 }
 
 async fn add_ip_home(templ: Template, req: Request) -> Markup {
@@ -111,7 +119,6 @@ async fn add_ip(State(s): State<AppState>, Form(ip): Form<AddIp>) -> impl IntoRe
     };
 
     let socket = SocketAddr::new(ip_addr, ip.port);
-    let db = s.surrealdb.get().await.unwrap();
 
     #[derive(Serialize, Deserialize)]
     pub struct IIp {
@@ -121,16 +128,16 @@ async fn add_ip(State(s): State<AppState>, Form(ip): Form<AddIp>) -> impl IntoRe
         pub selected: bool,
     }
 
-    let regs: Vec<Ip> = db
-        .insert("ips")
-        .content(IIp {
-            name: ip.name,
-            description: ip.description,
-            socket,
-            selected: s.selected_ip.read().await.is_none(),
-        })
-        .await
-        .unwrap();
+    let regs: Vec<Ip> =
+        s.db.insert("ips")
+            .content(IIp {
+                name: ip.name,
+                description: ip.description,
+                socket,
+                selected: s.selected_ip.read().await.is_none(),
+            })
+            .await
+            .unwrap();
 
     assert_eq!(regs.len(), 1);
     let data = regs.into_iter().next().unwrap();
@@ -143,24 +150,106 @@ async fn add_ip(State(s): State<AppState>, Form(ip): Form<AddIp>) -> impl IntoRe
 }
 
 // Endpoint to delete an IP
-async fn delete_ip(State(state): State<AppState>, Path(id): Path<String>) {
-    let db = state.surrealdb.get().await.unwrap();
+async fn delete_ip(State(s): State<AppState>, Path(id): Path<String>) -> Response {
+    let mut guard = s.selected_ip.write().await;
+    let _: Option<Ip> = s.db.delete(("ips", &id)).await.unwrap();
 
-    let _: Option<Ip> = db.delete(("ips", id)).await.unwrap();
+    let rem: Vec<Ip> = s.db.select("ips").await.unwrap();
+
+    let new = rem.iter().find(|ip| ip.id.id.to_string() != id).cloned();
+    let new = if let Some(new) = &new {
+        s.db.update(("ips", new.id.to_string()))
+            .patch(PatchOp::replace("/selected", true))
+            .await
+            .unwrap()
+    } else {
+        None
+    };
+
+    *guard = new.clone();
+
+    let mut res = (StatusCode::OK).into_response();
+    res.headers_mut()
+        .insert("HX-Refresh", HeaderValue::from_static("true"));
+
+    res
 }
 
 // Endpoint to get all IPs
 async fn ips_home(templ: Template, State(state): State<AppState>) -> Markup {
-    let db = state.surrealdb.get().await.unwrap();
-    let ips: Vec<Ip> = db.select("ips").await.unwrap();
+    let ips: Vec<Ip> = state.db.select("ips").await.unwrap();
 
     templ
         .render(Padded(html! {
-            div .flex .flex-col {
-                a .font-bold href="/ips/add" { "Add" }
-                div {
-                    @for ip in ips.iter() {
-                        p { (format!("{ip:?}")) }
+            script {
+                (PreEscaped(r#"""
+                    function select_ip(path) {
+                        fetch(path, {
+                            method: 'PATCH',
+                        }).then(() => {
+                            // location.reload();
+                            window.location.href = window.location.href;
+                        });
+                    }
+                """#))                
+            }
+            div .flex.flex-row .justify-between {
+                h1 .text-xl .font-bold { "Stored IPs" }
+
+                a href="/ips/add"
+                    .bg-foreground.text-background
+                    ."hover:bg-foreground/75"
+                    .rounded
+                    .px-2.py-1
+                    .font-bold
+                    { "Add IP" }
+            }
+
+            table .table-auto .text-left .border-separate {
+                thead {
+                    tr {
+                        th .pl-8 { "ID" }
+                        th .pl-8 { "Name" }
+                        th .pl-8 { "Description" }
+                        th .pl-8 { "Socket Addr" }
+                        th .pl-8 { "Selected" }
+                        th .pl-8 { "Action" }
+                    }
+                }
+                tbody {
+                    @for ip in ips {
+                        tr {
+                            td .pl-8 { code { (ip.id.id) } }
+                            td .pl-8 { (ip.name) }
+                            td .pl-8 { (ip.description) }
+                            td .pl-8 { (ip.socket) }
+                            td .pl-8 { (ip.selected) }
+                            td .pl-8 .space-x-5 {
+                                button
+                                    .text-sm
+                                    .text-foreground.transition-colors
+                                    hx-delete={ "/ips/" (ip.id.id) }
+                                    hx-target="closest tr"
+                                {
+                                    p."hover:text-foreground/80"."text-foreground/60"
+                                    { "Delete" }
+                                }
+
+                                button
+                                    .text-sm
+                                    .text-foreground.transition-colors
+                                    onclick={"select_ip(\"/ips/" (ip.id.id) "\")"}
+                                    // hx-patch={ "/ips/" (ip.id.id) }
+
+
+                                    // hx-swap="none"
+                                    // hx-target="closest body"
+                                {
+                                    p."hover:text-foreground/80"."text-foreground/60"
+                                    { "Select" }
+                                }
+                            }
+                        }
                     }
                 }
             }

@@ -67,7 +67,7 @@ async fn rule(
             h1 .text-xl .font-bold { "Rule " (rule.id) ": " (rule.name) }
             p { (rule.description) }
 
-            code .bg-gray-100 .mt-5 .p-1 .block .whitespace-pre .overflow-x-scroll {
+            code .bg-card .mt-5 .p-1 .block .whitespace-pre .overflow-x-scroll {
                 (PreEscaped(serde_json::to_string_pretty(&rule.rule).unwrap()))
             }
         }))
@@ -108,10 +108,12 @@ async fn rules(templ: Template, Selected(Ip { socket: ip, .. }): Selected) -> Ma
                             (Ref("View", &format!("/firewall/rules/{}", rule.id)))
                             button
                                 .text-sm
+                                .text-foreground.transition-colors
                                 hx-delete={ "http://" (ip) "/firewall/rules/" (rule.id) }
                                 hx-target="closest tr"
                             {
-                                "Delete"
+                                p."hover:text-foreground/80"."text-foreground/60"
+                                { "Delete" }
                             }
                         }
                     }

@@ -1,6 +1,7 @@
 use axum::http::request::Parts;
 use axum::{async_trait, extract::FromRequestParts};
 use front_components::Ref;
+use log::info;
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 use strum::{EnumIter, IntoEnumIterator};
 
@@ -14,10 +15,8 @@ pub enum ContentMode {
 
 impl Template {
     pub async fn new(parts: &Parts, state: &AppState) -> Self {
-        let db = state.surrealdb.get().await.unwrap();
-
         Template {
-            ips: db.select("ips").await.unwrap(),
+            ips: state.db.select("ips").await.unwrap(),
             selected_ip: state.selected_ip.read().await.clone(),
             title: format!("ADAM - {}", parts.uri.path()),
             mode: if parts.headers.get("HX-Request").is_some() {
@@ -257,6 +256,7 @@ async fn Template(
                         await fetch(`/ips/${selectedIp}`, {
                             method: 'PATCH',
                         });
+                        location.reload();
                     });
                     "#))
                 }
