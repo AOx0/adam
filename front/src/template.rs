@@ -205,26 +205,40 @@ async fn Template(
                         }
                     }
 
-                    // IP Selector Dropdown
-                    @if let Some(selected_ip) = &selected_ip {
-                        div.flex.flex-row.items-center."space-x-4" {
-                            form {
-                                label for="ip-select" { "Select IP: " }
-                                select
-                                    name="ip"
-                                    id="ip-select"
-                                {
-                                    @for ip in &ips {
-                                        @let id = ip.id.id.to_string();
-                                        @if ip == selected_ip {
-                                            option value=(id) selected
-                                            { (ip.name) " (" (ip.socket) ")" }
-                                        } @else {
-                                            option value=(id)
-                                            { (ip.name) " (" (ip.socket) ")" }
+                    div .flex.flex-row.space-x-4 {
+                        @if let Some(selected_ip) = &selected_ip {
+                            div.flex.flex-row.items-center."space-x-4" {
+                                form {
+                                    label for="ip-select" { "Select IP: " }
+                                    select
+                                        ."dark:text-background"
+                                        .px-2
+                                        .ml-2
+                                        .rounded
+                                        name="ip"
+                                        id="ip-select"
+                                    {
+                                        @for ip in &ips {
+                                            @let id = ip.id.id.to_string();
+                                            @if ip == selected_ip {
+                                                option value=(id) selected
+                                                { (ip.name) " (" (ip.socket) ")" }
+                                            } @else {
+                                                option value=(id)
+                                                { (ip.name) " (" (ip.socket) ")" }
+                                            }
                                         }
                                     }
                                 }
+                            }
+                        }
+
+                        button x-on:click="isDark = toggleDarkMode()" {
+                            div."dark:hidden".block."hover:opacity-80".transition-opacity {
+                                (PreEscaped(include_str!("../static/sun.svg")))
+                            }
+                            div.hidden."dark:block"."hover:opacity-80".transition-opacity {
+                                (PreEscaped(include_str!("../static/moon.svg")))
                             }
                         }
                     }
