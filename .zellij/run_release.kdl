@@ -3,14 +3,14 @@ layout {
     pane split_direction="horizontal" {
         pane split_direction="vertical" {
             pane command="just" {
-                args "run-firewall" "$ADAM_FIREWALL_IFACE"
+                args "run-firewall" "$ADAM_FIREWALL_IFACE" "--release"
             }
             pane command="just" {
-                args "run-controller"
+                args "run-controller" "--release"
             }
         }
         pane command="cargo-watch" {
-            args "-w" "./front" "-w" "./front-components" "-w" "./tailwind.config.js" "-cs" "just run-front"
+            args "-w" "./front" "-w" "./front-components" "-w" "./tailwind.config.js" "-cs" "just run-front --release"
         }
     }
 }
