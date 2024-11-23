@@ -1,7 +1,6 @@
 use axum::http::request::Parts;
 use axum::{async_trait, extract::FromRequestParts};
 use front_components::Ref;
-use log::info;
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 use strum::{EnumIter, IntoEnumIterator};
 
