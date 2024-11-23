@@ -24,7 +24,7 @@ run-firewall iface='lo' flags='': (build-firewall flags)
 
 # Build
 [positional-arguments]
-build flags='': (build-firewall flags) (build-controller) (build-front flags) 
+build flags='': (build-firewall flags) (build-controller flags) (build-front flags) 
 
 ## Build frontend
 [positional-arguments]
