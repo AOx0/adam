@@ -2,6 +2,8 @@ name: Cargo Build & Test
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 env:
@@ -14,21 +16,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup update nightly && rustup default nightly
-      - run: npm install -g tailwindcss
+      - name: Install Tailwind CSS
+        run: |
+          wget https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.15/tailwindcss-linux-x64 -O /usr/local/bin/tailwindcss
+          chmod +x /usr/local/bin/tailwindcss
       - name: Install just
         uses: baptiste0928/cargo-install@v3
         with:
           crate: just
-          locked: true
       - name: Install bpf-linker
         uses: baptiste0928/cargo-install@v3
         with:
           crate: bpf-linker
-          locked: true
       - name: Install cargo-nextest
-        uses: baptiste0928/cargo-install@v1
+        uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-nextest
-          locked: true
       - run: just build
-      - run: cargo nextest run --verbose
+      - run: cargo nextest run
