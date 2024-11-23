@@ -24,6 +24,7 @@ fn build_project(opts: &Options) -> Result<(), anyhow::Error> {
         args.push("--release")
     }
     let status = Command::new("cargo")
+        .current_dir(&opts.name)
         .args(&args)
         .status()
         .expect("failed to build userspace");
