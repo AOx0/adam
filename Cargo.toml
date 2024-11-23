@@ -5,11 +5,11 @@ members = ["xtask", "firewall", "firewall-common", "controller", "message", "net
 resolver = "2"
 
 [workspace.dependencies]
-bstr = "1.10.0"
+bstr = "1.11.0"
 async-bincode = "0.7.2"
-futures = "0.3.30"
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = { version = "1.0.128" }
+futures = "0.3.31"
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = { version = "1.0.133" }
 schemars = { version = "0.8.21" }
 deadpool = "0.12.1"
 maud = { version = "0.26.0", features = ["axum"] }
