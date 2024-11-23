@@ -15,7 +15,7 @@ run-controller flags='': (build-controller flags)
 # Run frontend
 [positional-arguments]
 run-front flags='': (build-front flags)
-    {{ if flags =~ ".*--release.*" { "./target/release/front" } else { "./target/debug/front" } }}
+    RUST_LOG=info {{ if flags =~ ".*--release.*" { "./target/release/front" } else { "./target/debug/front" } }}
 
 # Run controllers    
 [positional-arguments]
