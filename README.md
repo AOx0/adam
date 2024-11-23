@@ -2,16 +2,25 @@
 
 ## Prerequisites
 
-1. Install [`bpf-linker`](https://github.com/aya-rs/bpf-linker): `cargo install bpf-linker`
-2. Install [`zellij`](https://zellij.dev/): `cargo install zellij`
-3. Install [`cargo-watch`](https://github.com/watchexec/cargo-watch): `cargo install cargo-watch`
-4. Install [`just`](https://github.com/casey/just): `cargo install just`
-5. Install [`hurl`](https://hurl.dev/): `cargo install hurl`
+### Cranelift Codegen Backend
+
+```sh
+rustup component add rustc-codegen-cranelift-preview --toolchain nightly
+```
+
+### Dependencies
+
+1. Install [`lld`](https://lld.llvm.org/): `paru -S lld`; `sudo apti-get install lld`
+2. Install [`bpf-linker`](https://github.com/aya-rs/bpf-linker): `cargo install bpf-linker`
+3. Install [`zellij`](https://zellij.dev/): `cargo install zellij`
+4. Install [`cargo-watch`](https://github.com/watchexec/cargo-watch): `cargo install cargo-watch`
+5. Install [`just`](https://github.com/casey/just): `cargo install just`
+6. Install [`hurl`](https://hurl.dev/): `cargo install hurl`
 
 You may install all packages via your package manager, for example, for Arch Linux:
 
 ```sh
-paru -S just hurl zellij cargo-watch
+paru -S just hurl zellij cargo-watch lld
 cargo install bpf-linker
 ```
 
