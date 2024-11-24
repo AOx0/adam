@@ -106,11 +106,10 @@ async fn rules(templ: Template, Selected(Ip { socket: ip, .. }): Selected) -> Ma
         div #chart-container .w-full {}
 
         script {
-            (PreEscaped(format!("const raw_data = {events}")))
+            (PreEscaped(format!("const raw_data = {events};")))
+            (PreEscaped(format!("const ip = '{ip}';")))
             (PreEscaped(include_str!("./firewall_events.js")))
         }
-
-
 
         table .table-auto .text-left .border-separate {
             thead {

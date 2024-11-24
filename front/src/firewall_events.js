@@ -29,7 +29,7 @@ const svg = d3
 const data = raw_data.map((d) => {
   const date = d3.timeParse("%Y-%m-%dT%H:%M:%S.%f")(d.time.substring(0, 26));
   const roundedDate = new Date(
-    Math.floor(date.getTime() / (15 * 60 * 1000)) * (15 * 60 * 1000),
+    Math.floor(date.getTime() / (5 * 60 * 1000)) * (5 * 60 * 1000),
   );
   return {
     date: roundedDate,
@@ -38,7 +38,7 @@ const data = raw_data.map((d) => {
   };
 });
 
-// Aggregate data by 15-minute intervals
+// Aggregate data by 5-minute intervals
 const aggregatedData = d3
   .rollups(
     data,
@@ -69,7 +69,12 @@ xAxis = svg
  */
 const y = d3
   .scaleLinear()
-  .domain([0, d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) + 1])
+  .domain([
+    0,
+    d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
+      0.1 * d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
+      1,
+  ])
   .range([height, 0]);
 yAxis = svg.append("g").call(d3.axisLeft(y));
 
@@ -99,13 +104,62 @@ const linePlot = svg.append("g").attr("clip-path", "url(#clip)");
 // Add the lines
 const linePass = d3
   .line()
+  .defined(
+    (d, i, data) =>
+      d.pass !== null &&
+      (i === 0 || d.date - data[i - 1].date === 5 * 60 * 1000),
+  )
   .x((d) => x(d.date))
   .y((d) => y(d.pass));
 
 const lineBlocked = d3
   .line()
+  .defined(
+    (d, i, data) =>
+      d.blocked !== null &&
+      (i === 0 || d.date - data[i - 1].date === 5 * 60 * 1000),
+  )
   .x((d) => x(d.date))
   .y((d) => y(d.blocked));
+
+// Add the area under the lines
+const areaPass = d3
+  .area()
+  .defined(
+    (d, i, data) =>
+      d.pass !== null &&
+      (i === 0 || d.date - data[i - 1].date === 5 * 60 * 1000),
+  )
+  .x((d) => x(d.date))
+  .y0(y(0))
+  .y1((d) => y(d.pass));
+
+const areaBlocked = d3
+  .area()
+  .defined(
+    (d, i, data) =>
+      d.blocked !== null &&
+      (i === 0 || d.date - data[i - 1].date === 5 * 60 * 1000),
+  )
+  .x((d) => x(d.date))
+  .y0(y(0))
+  .y1((d) => y(d.blocked));
+
+linePlot
+  .append("path")
+  .datum(aggregatedData)
+  .attr("class", "area pass")
+  .attr("fill", "#69b3a2")
+  .attr("opacity", 0.3)
+  .attr("d", areaPass);
+
+linePlot
+  .append("path")
+  .datum(aggregatedData)
+  .attr("class", "area blocked")
+  .attr("fill", "#ff6347")
+  .attr("opacity", 0.3)
+  .attr("d", areaBlocked);
 
 linePlot
   .append("path")
@@ -205,6 +259,12 @@ function updateChart(event) {
   if (!extent) {
     if (!idleTimeout) return (idleTimeout = setTimeout(idled, 350)); // This allows to wait a little bit
     x.domain(d3.extent(aggregatedData, (d) => d.date));
+    y.domain([
+      0,
+      d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
+        0.1 * d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
+        1,
+    ]);
   } else {
     x.domain([x.invert(extent[0]), x.invert(extent[1])]);
     linePlot.select(".brush").call(brush.move, null); // This remove the grey brush area as soon as the selection has been done
@@ -212,16 +272,19 @@ function updateChart(event) {
 
   // Update axis and line plot position
   xAxis.transition().duration(1000).call(d3.axisBottom(x));
-  linePlot
-    .select(".line.pass")
-    .transition()
-    .duration(1000)
-    .attr("d", linePass(aggregatedData));
+  yAxis.transition().duration(1000).call(d3.axisLeft(y));
+  linePlot.select(".line.pass").transition().duration(1000).attr("d", linePass);
   linePlot
     .select(".line.blocked")
     .transition()
     .duration(1000)
-    .attr("d", lineBlocked(aggregatedData));
+    .attr("d", lineBlocked);
+  linePlot.select(".area.pass").transition().duration(1000).attr("d", areaPass);
+  linePlot
+    .select(".area.blocked")
+    .transition()
+    .duration(1000)
+    .attr("d", areaBlocked);
 
   // Update scatter points position
   circles
@@ -239,17 +302,26 @@ function updateChart(event) {
 // If user double click, reinitialize the chart
 svg.on("dblclick", function () {
   x.domain(d3.extent(aggregatedData, (d) => d.date));
+  y.domain([
+    0,
+    d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
+      0.1 * d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
+      1,
+  ]);
   xAxis.transition().duration(1000).call(d3.axisBottom(x));
-  linePlot
-    .select(".line.pass")
-    .transition()
-    .duration(1000)
-    .attr("d", linePass(aggregatedData));
+  yAxis.transition().duration(1000).call(d3.axisLeft(y));
+  linePlot.select(".line.pass").transition().duration(1000).attr("d", linePass);
   linePlot
     .select(".line.blocked")
     .transition()
     .duration(1000)
-    .attr("d", lineBlocked(aggregatedData));
+    .attr("d", lineBlocked);
+  linePlot.select(".area.pass").transition().duration(1000).attr("d", areaPass);
+  linePlot
+    .select(".area.blocked")
+    .transition()
+    .duration(1000)
+    .attr("d", areaBlocked);
   circles
     .transition()
     .duration(1000)
@@ -261,3 +333,104 @@ svg.on("dblclick", function () {
     .attr("cx", (d) => x(d.date))
     .attr("cy", (d) => y(d.blocked));
 });
+
+const ws = new WebSocket(`ws://${ip}/firewall/events/ws`);
+const liveUpdates = [];
+
+ws.onmessage = (event) => {
+  const parsedEvent = JSON.parse(event.data);
+
+  if (!parsedEvent.kind || !parsedEvent.kind.event) {
+    return;
+  }
+
+  const date = d3.timeParse("%Y-%m-%dT%H:%M:%S.%f")(
+    parsedEvent.kind.event.time.substring(0, 26),
+  );
+  const roundedDate = new Date(
+    Math.floor(date.getTime() / (5 * 60 * 1000)) * (5 * 60 * 1000),
+  );
+  // console.log(parsedEvent);
+  liveUpdates.push({
+    date: roundedDate,
+    pass: parsedEvent.kind.event.event === "pass" ? 1 : 0,
+    blocked: parsedEvent.kind.event.blocked ? 1 : 0,
+  });
+};
+
+setInterval(() => {
+  console.log("Live updates:", liveUpdates);
+  if (liveUpdates.length === 0) return;
+
+  data.push(...liveUpdates);
+  liveUpdates.length = 0;
+
+  // Re-aggregate data by 5-minute intervals
+  const newAggregatedData = d3
+    .rollups(
+      data,
+      (v) => ({
+        pass: d3.sum(v, (d) => d.pass),
+        blocked: d3.sum(v, (d) => d.blocked),
+      }),
+      (d) => d.date,
+    )
+    .map(([date, values]) => ({ date, ...values }));
+
+  // Preserve the current zoom state
+  const currentDomain = x.domain();
+
+  // Update scales
+  x.domain(d3.extent(newAggregatedData, (d) => d.date));
+  y.domain([
+    0,
+    d3.max(newAggregatedData, (d) => Math.max(d.pass, d.blocked)) +
+      0.1 * d3.max(newAggregatedData, (d) => Math.max(d.pass, d.blocked)) +
+      1,
+  ]);
+
+  // Restore the zoom state
+  x.domain(currentDomain);
+
+  // Update axis and line plot position
+  xAxis.transition().duration(1000).call(d3.axisBottom(x));
+  yAxis.transition().duration(1000).call(d3.axisLeft(y));
+  linePlot
+    .select(".line.pass")
+    .datum(newAggregatedData)
+    .transition()
+    .duration(1000)
+    .attr("d", linePass);
+  linePlot
+    .select(".line.blocked")
+    .datum(newAggregatedData)
+    .transition()
+    .duration(1000)
+    .attr("d", lineBlocked);
+  linePlot
+    .select(".area.pass")
+    .datum(newAggregatedData)
+    .transition()
+    .duration(1000)
+    .attr("d", areaPass);
+  linePlot
+    .select(".area.blocked")
+    .datum(newAggregatedData)
+    .transition()
+    .duration(1000)
+    .attr("d", areaBlocked);
+
+  // Update scatter points position
+  circles
+    .data(newAggregatedData)
+    .transition()
+    .duration(1000)
+    .attr("cx", (d) => x(d.date))
+    .attr("cy", (d) => y(d.pass));
+  blockedCircles
+    .data(newAggregatedData)
+    .transition()
+    .duration(1000)
+    .attr("cx", (d) => x(d.date))
+    .attr("cy", (d) => y(d.blocked));
+}, 10000);
