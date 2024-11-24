@@ -170,7 +170,7 @@ function updateChart(event) {
   // If no selection, back to initial coordinate. Otherwise, update X axis domain
   if (!extent) {
     if (!idleTimeout) return (idleTimeout = setTimeout(idled, 350)); // This allows to wait a little bit
-    x.domain([4, 8]);
+    x.domain(d3.extent(aggregatedData, (d) => d.date));
   } else {
     x.domain([x.invert(extent[0]), x.invert(extent[1])]);
     linePlot.select(".brush").call(brush.move, null); // This remove the grey brush area as soon as the selection has been done
@@ -195,10 +195,15 @@ function updateChart(event) {
 // If user double click, reinitialize the chart
 svg.on("dblclick", function () {
   x.domain(d3.extent(aggregatedData, (d) => d.date));
-  xAxis.transition().call(d3.axisBottom(x));
-  linePlot.select(".line").transition().attr("d", line(aggregatedData));
+  xAxis.transition().duration(1000).call(d3.axisBottom(x));
+  linePlot
+    .select(".line")
+    .transition()
+    .duration(1000)
+    .attr("d", line(aggregatedData));
   circles
     .transition()
+    .duration(1000)
     .attr("cx", (d) => x(d.date))
     .attr("cy", (d) => y(d.value));
 });
