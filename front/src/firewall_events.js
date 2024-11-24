@@ -24,7 +24,7 @@ const svg = d3
   .attr("transform", `translate(${margin.left},${margin.top})`);
 
 /**
- * @type {Array<{date: any, value: number}>}
+ * @type {Array<{date: any, pass: number, blocked: number}>}
  */
 const data = raw_data.map((d) => {
   const date = d3.timeParse("%Y-%m-%dT%H:%M:%S.%f")(d.time.substring(0, 26));
@@ -33,7 +33,8 @@ const data = raw_data.map((d) => {
   );
   return {
     date: roundedDate,
-    value: 1,
+    pass: d.event === "pass" ? 1 : 0,
+    blocked: d.event.blocked ? 1 : 0,
   };
 });
 
@@ -41,10 +42,13 @@ const data = raw_data.map((d) => {
 const aggregatedData = d3
   .rollups(
     data,
-    (v) => d3.sum(v, (d) => d.value),
+    (v) => ({
+      pass: d3.sum(v, (d) => d.pass),
+      blocked: d3.sum(v, (d) => d.blocked),
+    }),
     (d) => d.date,
   )
-  .map(([date, value]) => ({ date, value }));
+  .map(([date, values]) => ({ date, ...values }));
 
 // Add X axis --> it is a date format
 /**
@@ -65,7 +69,7 @@ xAxis = svg
  */
 const y = d3
   .scaleLinear()
-  .domain([0, d3.max(aggregatedData, (d) => +d.value) + 1])
+  .domain([0, d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) + 1])
   .range([height, 0]);
 yAxis = svg.append("g").call(d3.axisLeft(y));
 
@@ -92,20 +96,34 @@ const brush = d3
 // Create the line plot variable: where both the line plot and the brush take place
 const linePlot = svg.append("g").attr("clip-path", "url(#clip)");
 
-// Add the line
-const line = d3
+// Add the lines
+const linePass = d3
   .line()
   .x((d) => x(d.date))
-  .y((d) => y(d.value));
+  .y((d) => y(d.pass));
+
+const lineBlocked = d3
+  .line()
+  .x((d) => x(d.date))
+  .y((d) => y(d.blocked));
 
 linePlot
   .append("path")
   .datum(aggregatedData)
-  .attr("class", "line")
+  .attr("class", "line pass")
   .attr("fill", "none")
   .attr("stroke", "#69b3a2")
   .attr("stroke-width", 1.5)
-  .attr("d", line);
+  .attr("d", linePass);
+
+linePlot
+  .append("path")
+  .datum(aggregatedData)
+  .attr("class", "line blocked")
+  .attr("fill", "none")
+  .attr("stroke", "#ff6347")
+  .attr("stroke-width", 1.5)
+  .attr("d", lineBlocked);
 
 // Add the brushing
 linePlot.append("g").attr("class", "brush").call(brush);
@@ -127,8 +145,10 @@ const showTooltip = function (event, d) {
     .html(
       "Time: " +
         d3.timeFormat("%Y-%m-%d %H:%M:%S")(d.date) +
-        "<br>Number of events: " +
-        d.value,
+        "<br>Pass events: " +
+        d.pass +
+        "<br>Blocked events: " +
+        d.blocked,
     )
     .style("left", event.pageX + "px")
     .style("top", event.pageY + "px");
@@ -149,9 +169,23 @@ const circles = linePlot
   .enter()
   .append("circle")
   .attr("cx", (d) => x(d.date))
-  .attr("cy", (d) => y(d.value))
+  .attr("cy", (d) => y(d.pass))
   .attr("r", 3)
   .attr("fill", "#69b3a2")
+  .on("mouseover", showTooltip)
+  .on("mousemove", moveTooltip)
+  .on("mouseleave", hideTooltip);
+
+const blockedCircles = linePlot
+  .selectAll("circle.blocked")
+  .data(aggregatedData)
+  .enter()
+  .append("circle")
+  .attr("class", "blocked")
+  .attr("cx", (d) => x(d.date))
+  .attr("cy", (d) => y(d.blocked))
+  .attr("r", 3)
+  .attr("fill", "#ff6347")
   .on("mouseover", showTooltip)
   .on("mousemove", moveTooltip)
   .on("mouseleave", hideTooltip);
@@ -179,17 +213,27 @@ function updateChart(event) {
   // Update axis and line plot position
   xAxis.transition().duration(1000).call(d3.axisBottom(x));
   linePlot
-    .select(".line")
+    .select(".line.pass")
     .transition()
     .duration(1000)
-    .attr("d", line(aggregatedData));
+    .attr("d", linePass(aggregatedData));
+  linePlot
+    .select(".line.blocked")
+    .transition()
+    .duration(1000)
+    .attr("d", lineBlocked(aggregatedData));
 
   // Update scatter points position
   circles
     .transition()
     .duration(1000)
     .attr("cx", (d) => x(d.date))
-    .attr("cy", (d) => y(d.value));
+    .attr("cy", (d) => y(d.pass));
+  blockedCircles
+    .transition()
+    .duration(1000)
+    .attr("cx", (d) => x(d.date))
+    .attr("cy", (d) => y(d.blocked));
 }
 
 // If user double click, reinitialize the chart
@@ -197,13 +241,23 @@ svg.on("dblclick", function () {
   x.domain(d3.extent(aggregatedData, (d) => d.date));
   xAxis.transition().duration(1000).call(d3.axisBottom(x));
   linePlot
-    .select(".line")
+    .select(".line.pass")
     .transition()
     .duration(1000)
-    .attr("d", line(aggregatedData));
+    .attr("d", linePass(aggregatedData));
+  linePlot
+    .select(".line.blocked")
+    .transition()
+    .duration(1000)
+    .attr("d", lineBlocked(aggregatedData));
   circles
     .transition()
     .duration(1000)
     .attr("cx", (d) => x(d.date))
-    .attr("cy", (d) => y(d.value));
+    .attr("cy", (d) => y(d.pass));
+  blockedCircles
+    .transition()
+    .duration(1000)
+    .attr("cx", (d) => x(d.date))
+    .attr("cy", (d) => y(d.blocked));
 });
