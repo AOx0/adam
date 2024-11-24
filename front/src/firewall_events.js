@@ -56,7 +56,10 @@ const aggregatedData = d3
  */
 const x = d3
   .scaleTime()
-  .domain(d3.extent(aggregatedData, (d) => d.date))
+  .domain([
+    d3.min(aggregatedData, (d) => d.date),
+    new Date(d3.max(aggregatedData, (d) => d.date).getTime() + 5 * 60 * 1000),
+  ])
   .range([0, width]);
 xAxis = svg
   .append("g")
@@ -69,12 +72,7 @@ xAxis = svg
  */
 const y = d3
   .scaleLinear()
-  .domain([
-    0,
-    d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
-      0.1 * d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
-      1,
-  ])
+  .domain([0, d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) * 1.2])
   .range([height, 0]);
 yAxis = svg.append("g").call(d3.axisLeft(y));
 
@@ -258,12 +256,13 @@ function updateChart(event) {
   // If no selection, back to initial coordinate. Otherwise, update X axis domain
   if (!extent) {
     if (!idleTimeout) return (idleTimeout = setTimeout(idled, 350)); // This allows to wait a little bit
-    x.domain(d3.extent(aggregatedData, (d) => d.date));
+    x.domain([
+      d3.min(aggregatedData, (d) => d.date),
+      new Date(d3.max(aggregatedData, (d) => d.date).getTime() + 5 * 60 * 1000),
+    ]);
     y.domain([
       0,
-      d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
-        0.1 * d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
-        1,
+      d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) * 1.2,
     ]);
   } else {
     x.domain([x.invert(extent[0]), x.invert(extent[1])]);
@@ -286,13 +285,16 @@ function updateChart(event) {
     .duration(1000)
     .attr("d", areaBlocked);
 
-  // Update scatter points position
-  circles
+  // Update all circles positions
+  linePlot
+    .selectAll("circle:not(.blocked)")
     .transition()
     .duration(1000)
     .attr("cx", (d) => x(d.date))
     .attr("cy", (d) => y(d.pass));
-  blockedCircles
+
+  linePlot
+    .selectAll("circle.blocked")
     .transition()
     .duration(1000)
     .attr("cx", (d) => x(d.date))
@@ -301,12 +303,13 @@ function updateChart(event) {
 
 // If user double click, reinitialize the chart
 svg.on("dblclick", function () {
-  x.domain(d3.extent(aggregatedData, (d) => d.date));
+  x.domain([
+    d3.min(aggregatedData, (d) => d.date),
+    new Date(d3.max(aggregatedData, (d) => d.date).getTime() + 5 * 60 * 1000),
+  ]);
   y.domain([
     0,
-    d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
-      0.1 * d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) +
-      1,
+    d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) * 1.2,
   ]);
   xAxis.transition().duration(1000).call(d3.axisBottom(x));
   yAxis.transition().duration(1000).call(d3.axisLeft(y));
@@ -322,12 +325,17 @@ svg.on("dblclick", function () {
     .transition()
     .duration(1000)
     .attr("d", areaBlocked);
-  circles
+
+  // Update all circles
+  linePlot
+    .selectAll("circle:not(.blocked)")
     .transition()
     .duration(1000)
     .attr("cx", (d) => x(d.date))
     .attr("cy", (d) => y(d.pass));
-  blockedCircles
+
+  linePlot
+    .selectAll("circle.blocked")
     .transition()
     .duration(1000)
     .attr("cx", (d) => x(d.date))
@@ -377,24 +385,38 @@ setInterval(() => {
     )
     .map(([date, values]) => ({ date, ...values }));
 
-  // Preserve the current zoom state
-  const currentDomain = x.domain();
+  // Get current domains
+  const currentXDomain = x.domain();
+  const currentYDomain = y.domain();
 
-  // Update scales
-  x.domain(d3.extent(newAggregatedData, (d) => d.date));
-  y.domain([
+  // Calculate new domains
+  const newXDomain = [
+    d3.min(newAggregatedData, (d) => d.date),
+    new Date(
+      d3.max(newAggregatedData, (d) => d.date).getTime() + 5 * 60 * 1000,
+    ),
+  ];
+  const newYDomain = [
     0,
-    d3.max(newAggregatedData, (d) => Math.max(d.pass, d.blocked)) +
-      0.1 * d3.max(newAggregatedData, (d) => Math.max(d.pass, d.blocked)) +
-      1,
-  ]);
+    d3.max(newAggregatedData, (d) => Math.max(d.pass, d.blocked)) * 1.2,
+  ];
 
-  // Restore the zoom state
-  x.domain(currentDomain);
+  // Only update domains if they've changed
+  const needXUpdate =
+    newXDomain[0] < currentXDomain[0] || newXDomain[1] > currentXDomain[1];
+  const needYUpdate = newYDomain[1] > currentYDomain[1];
 
-  // Update axis and line plot position
-  xAxis.transition().duration(1000).call(d3.axisBottom(x));
-  yAxis.transition().duration(1000).call(d3.axisLeft(y));
+  if (needXUpdate) {
+    x.domain(newXDomain);
+    xAxis.transition().duration(1000).call(d3.axisBottom(x));
+  }
+
+  if (needYUpdate) {
+    y.domain(newYDomain);
+    yAxis.transition().duration(1000).call(d3.axisLeft(y));
+  }
+
+  // Update line plots and areas
   linePlot
     .select(".line.pass")
     .datum(newAggregatedData)
@@ -420,15 +442,48 @@ setInterval(() => {
     .duration(1000)
     .attr("d", areaBlocked);
 
-  // Update scatter points position
-  circles
-    .data(newAggregatedData)
+  // Update and add new points for pass events
+  const updatedCircles = linePlot
+    .selectAll("circle:not(.blocked)")
+    .data(newAggregatedData);
+
+  updatedCircles.exit().remove();
+
+  const newCircles = updatedCircles
+    .enter()
+    .append("circle")
+    .attr("r", 3)
+    .attr("fill", "#69b3a2")
+    .on("mouseover", showTooltip)
+    .on("mousemove", moveTooltip)
+    .on("mouseleave", hideTooltip);
+
+  updatedCircles
+    .merge(newCircles)
     .transition()
     .duration(1000)
     .attr("cx", (d) => x(d.date))
     .attr("cy", (d) => y(d.pass));
-  blockedCircles
-    .data(newAggregatedData)
+
+  // Update and add new points for blocked events
+  const updatedBlockedCircles = linePlot
+    .selectAll("circle.blocked")
+    .data(newAggregatedData);
+
+  updatedBlockedCircles.exit().remove();
+
+  const newBlockedCircles = updatedBlockedCircles
+    .enter()
+    .append("circle")
+    .attr("class", "blocked")
+    .attr("r", 3)
+    .attr("fill", "#ff6347")
+    .on("mouseover", showTooltip)
+    .on("mousemove", moveTooltip)
+    .on("mouseleave", hideTooltip);
+
+  updatedBlockedCircles
+    .merge(newBlockedCircles)
     .transition()
     .duration(1000)
     .attr("cx", (d) => x(d.date))
