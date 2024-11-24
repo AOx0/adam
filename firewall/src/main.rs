@@ -3,7 +3,7 @@
 use std::env;
 use std::fmt::Debug;
 use std::io::Error;
-use std::ops::ControlFlow;
+use std::ops::{ControlFlow, DerefMut};
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -31,7 +31,7 @@ use tokio::io::unix::{AsyncFd, AsyncFdReadyMutGuard};
 use tokio::net::unix::SocketAddr;
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::watch::{Receiver, Sender};
-use tokio::sync::{broadcast, Mutex};
+use tokio::sync::{broadcast, Mutex, OnceCell};
 use tokio::{select, signal, sync};
 
 use diesel::prelude::*;
@@ -85,22 +85,33 @@ where
     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
 }
 
-async fn init_db() -> SyncConnectionWrapper<SqliteConnection> {
-    let db = get_db().await;
+async fn init_db() -> Arc<Mutex<SyncConnectionWrapper<SqliteConnection>>> {
+    tokio::fs::create_dir_all("/var/lib/adam").await.unwrap();
+    let db = env::var("DATABASE_URL").unwrap_or("file:///var/lib/adam/firewall.db".to_string());
+    let db = SyncConnectionWrapper::<SqliteConnection>::establish(&db)
+        .await
+        .unwrap();
 
     run_migrations(db).await.unwrap();
+
     get_db().await
 }
 
-async fn get_db() -> SyncConnectionWrapper<SqliteConnection> {
+static DB: OnceCell<Arc<Mutex<SyncConnectionWrapper<SqliteConnection>>>> = OnceCell::const_new();
+
+async fn get_db() -> Arc<Mutex<SyncConnectionWrapper<SqliteConnection>>> {
     dotenv().ok();
 
-    tokio::fs::create_dir_all("/var/lib/adam").await.unwrap();
-    let db = env::var("DATABASE_URL").unwrap_or("file:///var/lib/adam/firewall.db".to_string());
-
-    SyncConnectionWrapper::<SqliteConnection>::establish(&db)
-        .await
-        .unwrap()
+    DB.get_or_init(|| async {
+        let db = env::var("DATABASE_URL").unwrap_or("file:///var/lib/adam/firewall.db".to_string());
+        Arc::new(Mutex::new(
+            SyncConnectionWrapper::<SqliteConnection>::establish(&db)
+                .await
+                .unwrap(),
+        ))
+    })
+    .await
+    .clone()
 }
 
 #[derive(Serialize, Deserialize, Identifiable, Queryable, Insertable, Selectable)]
@@ -196,11 +207,15 @@ async fn main() -> Result<(), anyhow::Error> {
         Array::try_from(bpf.map_mut("FIREWALL_RULES").unwrap()).unwrap();
     let db = &mut init_db().await;
 
-    let rules: Vec<StoredRule> = rules::table.load(db).await.unwrap();
-    for rule in rules {
-        let deserialize_from: Rule = bincode::deserialize_from(rule.rule.as_slice()).unwrap();
-        config.set(rule.id as u32, deserialize_from, 0).unwrap();
-    }
+    {
+        let mut db = db.lock().await;
+
+        let rules: Vec<StoredRule> = rules::table.load(db.deref_mut()).await.unwrap();
+        for rule in rules {
+            let deserialize_from: Rule = bincode::deserialize_from(rule.rule.as_slice()).unwrap();
+            config.set(rule.id as u32, deserialize_from, 0).unwrap();
+        }
+    };
 
     register!("firewall");
     register!("ipv4_tcp", programs::IPV4_TCP);
@@ -400,7 +415,6 @@ async fn handle_message(
                             if let Ok(Rule { init: false, .. }) = config.get(&idx, 0) {
                                 rule.id = idx;
                                 config.set(idx, rule, 0).unwrap();
-                                let mut db = get_db().await;
                                 let mut buffer = [0u8; std::mem::size_of::<Rule>()];
 
                                 bincode::serialize_into(&mut buffer[..], &rule).unwrap();
@@ -411,7 +425,7 @@ async fn handle_message(
                                         name: &meta.name,
                                         description: &meta.description,
                                     })
-                                    .execute(&mut db)
+                                    .execute(get_db().await.lock().await.deref_mut())
                                     .await
                                     .unwrap();
 
@@ -425,10 +439,9 @@ async fn handle_message(
                 Request::DeleteRule(idx @ 0..MAX_RULES) => {
                     if let Ok(mut rule @ Rule { init: true, .. }) = config.get(&idx, 0) {
                         rule.init = false;
-                        let mut db = get_db().await;
 
                         diesel::delete(rules::table.filter(rules::dsl::id.eq(idx as i32)))
-                            .execute(&mut db)
+                            .execute(get_db().await.lock().await.deref_mut())
                             .await
                             .unwrap();
 
@@ -477,11 +490,9 @@ async fn handle_message(
 
                             rule.enabled = action.as_bool().unwrap_or(!rule.enabled);
 
-                            let mut db = get_db().await;
-
                             diesel::update(rules::table.filter(rules::dsl::id.eq(idx as i32)))
                                 .set(rules::dsl::rule.eq(bincode::serialize(&rule).unwrap()))
-                                .execute(&mut db)
+                                .execute(get_db().await.lock().await.deref_mut())
                                 .await
                                 .unwrap();
 
@@ -499,10 +510,9 @@ async fn handle_message(
                 }
                 Request::GetRule(idx @ 0..MAX_RULES) => {
                     if let Ok(rule @ Rule { init: true, .. }) = config.get(&idx, 0) {
-                        let mut db = get_db().await;
                         let meta = rules::table
                             .filter(rules::id.eq(idx as i32))
-                            .first::<StoredRule>(&mut db)
+                            .first::<StoredRule>(get_db().await.lock().await.deref_mut())
                             .await
                             .unwrap();
 
@@ -532,7 +542,7 @@ async fn handle_message(
                             let mut db = get_db().await;
                             rules::table
                                 .filter(rules::id.eq(id))
-                                .first::<StoredRule>(&mut db)
+                                .first::<StoredRule>(get_db().await.lock().await.deref_mut())
                                 .await
                                 .unwrap()
                         }
@@ -556,13 +566,11 @@ async fn handle_message(
                     State::Started => Response::Status(Status::Running),
                 }),
                 Request::GetEvents(event_query) => {
-                    let mut db = get_db().await;
-
                     let events = match event_query {
                         message::EventQuery::All => {
                             events::table
                                 .select(StoredEvent::as_select())
-                                .load::<StoredEvent>(&mut db)
+                                .load::<StoredEvent>(get_db().await.lock().await.deref_mut())
                                 .await
                         }
                         message::EventQuery::Last(duration) => {
@@ -571,14 +579,14 @@ async fn handle_message(
                             events::table
                                 .filter(events::time.ge(since))
                                 .select(StoredEvent::as_select())
-                                .load::<StoredEvent>(&mut db)
+                                .load::<StoredEvent>(get_db().await.lock().await.deref_mut())
                                 .await
                         }
                         message::EventQuery::Since(datetime) => {
                             events::table
                                 .filter(events::time.ge(datetime))
                                 .select(StoredEvent::as_select())
-                                .load::<StoredEvent>(&mut db)
+                                .load::<StoredEvent>(get_db().await.lock().await.deref_mut())
                                 .await
                         }
                     }
@@ -701,7 +709,6 @@ async fn handle_event(
 ) {
     let mut guard = guard.unwrap();
     let ring_buf = guard.get_inner_mut();
-    let mut db = get_db().await;
     let mut buffer = [0u8; std::mem::size_of::<Event>()];
 
     while let Some(item) = ring_buf.next() {
@@ -709,9 +716,9 @@ async fn handle_event(
             continue;
         };
 
-        if let Event::Pass = event {
-            continue;
-        }
+        // if let Event::Pass = event {
+        //     continue;
+        // }
 
         let time = chrono::Local::now().naive_utc();
         let stored = StoredEventDecoded {
@@ -729,7 +736,7 @@ async fn handle_event(
                 time,
                 event: &buffer,
             })
-            .execute(&mut db)
+            .execute(get_db().await.lock().await.deref_mut())
             .await
             .unwrap();
     }
