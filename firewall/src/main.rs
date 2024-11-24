@@ -716,10 +716,6 @@ async fn handle_event(
             continue;
         };
 
-        // if let Event::Pass = event {
-        //     continue;
-        // }
-
         let time = chrono::Local::now().naive_utc();
         let stored = StoredEventDecoded {
             time,
@@ -728,7 +724,9 @@ async fn handle_event(
 
         etx.send(LogKind::Event(stored)).ok(); // We dont care if there are no event listeners
 
-        info!("{:?}", event);
+        if let Event::Blocked { .. } = event {
+            info!("{:?}", event);
+        }
 
         bincode::serialize_into(&mut buffer[..], event).unwrap();
         diesel::insert_into(events::table)
