@@ -39,7 +39,7 @@ const data = raw_data.map((d) => {
 });
 
 // Aggregate data by 5-minute intervals
-const aggregatedData = d3
+let aggregatedData = d3
   .rollups(
     data,
     (v) => ({
@@ -374,7 +374,7 @@ setInterval(() => {
   liveUpdates.length = 0;
 
   // Re-aggregate data by 5-minute intervals
-  const newAggregatedData = d3
+  aggregatedData = d3
     .rollups(
       data,
       (v) => ({
@@ -391,14 +391,12 @@ setInterval(() => {
 
   // Calculate new domains
   const newXDomain = [
-    d3.min(newAggregatedData, (d) => d.date),
-    new Date(
-      d3.max(newAggregatedData, (d) => d.date).getTime() + 5 * 60 * 1000,
-    ),
+    d3.min(aggregatedData, (d) => d.date),
+    new Date(d3.max(aggregatedData, (d) => d.date).getTime() + 5 * 60 * 1000),
   ];
   const newYDomain = [
     0,
-    d3.max(newAggregatedData, (d) => Math.max(d.pass, d.blocked)) * 1.2,
+    d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) * 1.2,
   ];
 
   // Only update domains if they've changed
@@ -419,25 +417,25 @@ setInterval(() => {
   // Update line plots and areas
   linePlot
     .select(".line.pass")
-    .datum(newAggregatedData)
+    .datum(aggregatedData)
     .transition()
     .duration(1000)
     .attr("d", linePass);
   linePlot
     .select(".line.blocked")
-    .datum(newAggregatedData)
+    .datum(aggregatedData)
     .transition()
     .duration(1000)
     .attr("d", lineBlocked);
   linePlot
     .select(".area.pass")
-    .datum(newAggregatedData)
+    .datum(aggregatedData)
     .transition()
     .duration(1000)
     .attr("d", areaPass);
   linePlot
     .select(".area.blocked")
-    .datum(newAggregatedData)
+    .datum(aggregatedData)
     .transition()
     .duration(1000)
     .attr("d", areaBlocked);
@@ -445,7 +443,7 @@ setInterval(() => {
   // Update and add new points for pass events
   const updatedCircles = linePlot
     .selectAll("circle:not(.blocked)")
-    .data(newAggregatedData);
+    .data(aggregatedData);
 
   updatedCircles.exit().remove();
 
@@ -468,7 +466,7 @@ setInterval(() => {
   // Update and add new points for blocked events
   const updatedBlockedCircles = linePlot
     .selectAll("circle.blocked")
-    .data(newAggregatedData);
+    .data(aggregatedData);
 
   updatedBlockedCircles.exit().remove();
 
