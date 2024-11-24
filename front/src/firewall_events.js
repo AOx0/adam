@@ -361,7 +361,7 @@ ws.onmessage = (event) => {
   liveUpdates.push({
     date: roundedDate,
     pass: parsedEvent.kind.event.event === "pass" ? 1 : 0,
-    blocked: parsedEvent.kind.event.blocked ? 1 : 0,
+    blocked: parsedEvent.kind.event.event.blocked ? 1 : 0,
   });
 };
 
