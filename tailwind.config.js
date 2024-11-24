@@ -5,7 +5,7 @@ module.exports = {
   darkMode: 'class',
   content: {
     relative: true,
-    files: ["./front/src/**/*.rs", "./front-components/src/**/*.rs", "./controller/src/**/*.rs"]
+    files: ["./front/src/**/*.{js,rs}", "./front-components/src/**/*.{js,rs}", "./controller/src/**/*.{js,rs}"]
   },
   theme: {
     extend: {

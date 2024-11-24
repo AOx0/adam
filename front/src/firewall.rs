@@ -5,6 +5,7 @@ use axum::{
     routing::get,
     Router,
 };
+use firewall_common::StoredEventDecoded;
 use front_components::*;
 use maud::{html, Markup, PreEscaped};
 use rand::RngCore;
@@ -82,10 +83,34 @@ async fn rules(templ: Template, Selected(Ip { socket: ip, .. }): Selected) -> Ma
     let rules: Vec<firewall_common::StoredRuleDecoded> =
         serde_json::from_str(&res.text().await.unwrap()).unwrap();
 
+    let events = reqwest::Client::new()
+        .get(format!("http://{ip}/firewall/events/query"))
+        .header("Content-Type", "application/json")
+        .body("\"all\"")
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
+    // let events: Vec<StoredEventDecoded> = serde_json::from_str(&events).unwrap();
+    // log::info!("Got {}", events.len());
+
     templ.render(Padded(html! {
         h1 .text-xl .font-bold { "Firewall" }
 
         p { "Status: " span hx-get={"http://" (ip) "/firewall/state"} hx-trigger="load, every 30s" {} }
+
+        script src="https://d3js.org/d3.v6.min.js" {}
+        div #chart-container .w-full {}
+
+        script {
+            (PreEscaped(format!("const raw_data = {events}")))
+            (PreEscaped(include_str!("./firewall_events.js")))
+        }
+
+
 
         table .table-auto .text-left .border-separate {
             thead {
