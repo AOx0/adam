@@ -89,12 +89,12 @@ const clip = svg
 
 // Add brushing
 const brush = d3
-  .brushX() // Add the brush feature using the d3.brush function
+  .brushX()
   .extent([
     [0, 0],
     [width, height],
-  ]) // initialise the brush area: start at 0,0 and finishes at width,height: it means I select the whole graph area
-  .on("end", updateChart); // Each time the brush selection changes, trigger the 'updateChart' function
+  ])
+  .on("end", updateChart);
 
 // Create the line plot variable: where both the line plot and the brush take place
 const linePlot = svg.append("g").attr("clip-path", "url(#clip)");
@@ -255,7 +255,7 @@ function updateChart(event) {
 
   // If no selection, back to initial coordinate. Otherwise, update X axis domain
   if (!extent) {
-    if (!idleTimeout) return (idleTimeout = setTimeout(idled, 350)); // This allows to wait a little bit
+    if (!idleTimeout) return (idleTimeout = setTimeout(idled, 350));
     x.domain([
       d3.min(aggregatedData, (d) => d.date),
       new Date(d3.max(aggregatedData, (d) => d.date).getTime() + 5 * 60 * 1000),
@@ -358,7 +358,6 @@ ws.onmessage = (event) => {
   const roundedDate = new Date(
     Math.floor(date.getTime() / (5 * 60 * 1000)) * (5 * 60 * 1000),
   );
-  // console.log(parsedEvent);
   liveUpdates.push({
     date: roundedDate,
     pass: parsedEvent.kind.event.event === "pass" ? 1 : 0,
@@ -387,27 +386,13 @@ setInterval(() => {
 
   // Get current domains
   const currentXDomain = x.domain();
-  const currentYDomain = y.domain();
 
-  // Calculate new domains
-  const newXDomain = [
-    d3.min(aggregatedData, (d) => d.date),
-    new Date(d3.max(aggregatedData, (d) => d.date).getTime() + 5 * 60 * 1000),
-  ];
+  // Only update Y domain if necessary
   const newYDomain = [
     0,
     d3.max(aggregatedData, (d) => Math.max(d.pass, d.blocked)) * 1.2,
   ];
-
-  // Only update domains if they've changed
-  const needXUpdate =
-    newXDomain[0] < currentXDomain[0] || newXDomain[1] > currentXDomain[1];
-  const needYUpdate = newYDomain[1] > currentYDomain[1];
-
-  if (needXUpdate) {
-    x.domain(newXDomain);
-    xAxis.transition().duration(1000).call(d3.axisBottom(x));
-  }
+  const needYUpdate = newYDomain[1] > y.domain()[1];
 
   if (needYUpdate) {
     y.domain(newYDomain);
