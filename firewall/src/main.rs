@@ -539,7 +539,6 @@ async fn handle_message(
                     let res = futures::future::join_all(rules.iter().map(|rule| {
                         let id = rule.0 as i32;
                         async move {
-                            let mut db = get_db().await;
                             rules::table
                                 .filter(rules::id.eq(id))
                                 .first::<StoredRule>(get_db().await.lock().await.deref_mut())

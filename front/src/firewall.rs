@@ -5,7 +5,6 @@ use axum::{
     routing::get,
     Router,
 };
-use firewall_common::StoredEventDecoded;
 use front_components::*;
 use maud::{html, Markup, PreEscaped};
 use rand::RngCore;
@@ -63,7 +62,7 @@ async fn rule(
                 (Ref("< Rules", "/firewall/rules"))
             }
 
-            (front_components::rule_status(rule.rule.enabled, rule.id as u32))
+            (front_components::RuleStatus(rule.rule.enabled, rule.id as u32, ip))
 
             h1 .text-xl .font-bold { "Rule " (rule.id) ": " (rule.name) }
             p { (rule.description) }
@@ -127,7 +126,7 @@ async fn rules(templ: Template, Selected(Ip { socket: ip, .. }): Selected) -> Ma
                         td .pl-8 { (rule.id) }
                         td .pl-8 { (rule.name) }
                         td .pl-8 { (rule.description) }
-                        td .pl-8 .text-center { (front_components::rule_status(rule.rule.enabled, rule.id as u32)) }
+                        td .pl-8 .text-center { (front_components::RuleStatus(rule.rule.enabled, rule.id as u32, ip)) }
                         td .pl-8 .space-x-5 {
                             (Ref("View", &format!("/firewall/rules/{}", rule.id)))
                             button
