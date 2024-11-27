@@ -139,22 +139,22 @@ pub async fn listen_events(ws: WebSocketUpgrade) -> Response {
     ws.on_upgrade(event_dispatcher)
 }
 
-pub async fn delete(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
+pub async fn delete(State(s): State<AppState>, Path((idx,)): Path<([u8; 32],)>) {
     s.firewall_pool.get().await.unwrap().delete(idx).await;
 }
 
-pub async fn enable(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
+pub async fn enable(State(s): State<AppState>, Path((idx,)): Path<([u8; 32],)>) {
     s.firewall_pool.get().await.unwrap().enable(idx).await;
 }
 
-pub async fn disable(State(s): State<AppState>, Path((idx,)): Path<(u32,)>) {
+pub async fn disable(State(s): State<AppState>, Path((idx,)): Path<([u8; 32],)>) {
     s.firewall_pool.get().await.unwrap().disable(idx).await;
 }
 
 pub async fn toggle(
     htmx: Htmx,
     State(s): State<AppState>,
-    Path((idx,)): Path<(u32,)>,
+    Path((idx,)): Path<([u8; 32],)>,
 ) -> Result<Markup, ()> {
     let change = s.firewall_pool.get().await.unwrap().toggle(idx).await;
 
@@ -182,7 +182,7 @@ pub async fn toggle(
 
 pub async fn get_rule(
     State(s): State<AppState>,
-    Path((idx,)): Path<(u32,)>,
+    Path((idx,)): Path<([u8; 32],)>,
 ) -> Json<Option<StoredRuleDecoded>> {
     Json(s.firewall_pool.get().await.unwrap().get_rule(idx).await)
 }
@@ -248,12 +248,12 @@ impl Socket {
         self.stream.next().await.unwrap().unwrap()
     }
 
-    pub async fn delete(&mut self, idx: u32) {
+    pub async fn delete(&mut self, idx: [u8; 32]) {
         self.send(Message::Firewall(firewall::Request::DeleteRule(idx)))
             .await;
     }
 
-    pub async fn enable(&mut self, idx: u32) -> firewall::RuleChange {
+    pub async fn enable(&mut self, idx: [u8; 32]) -> firewall::RuleChange {
         self.send(Message::Firewall(firewall::Request::EnableRule(idx)))
             .await;
 
@@ -265,7 +265,7 @@ impl Socket {
         change
     }
 
-    pub async fn disable(&mut self, idx: u32) -> firewall::RuleChange {
+    pub async fn disable(&mut self, idx: [u8; 32]) -> firewall::RuleChange {
         self.send(Message::Firewall(firewall::Request::DisableRule(idx)))
             .await;
 
@@ -289,7 +289,7 @@ impl Socket {
         events
     }
 
-    pub async fn toggle(&mut self, idx: u32) -> firewall::RuleChange {
+    pub async fn toggle(&mut self, idx: [u8; 32]) -> firewall::RuleChange {
         self.send(Message::Firewall(firewall::Request::ToggleRule(idx)))
             .await;
 
@@ -317,7 +317,7 @@ impl Socket {
         status
     }
 
-    pub async fn get_rule(&mut self, idx: u32) -> Option<StoredRuleDecoded> {
+    pub async fn get_rule(&mut self, idx: [u8; 32]) -> Option<StoredRuleDecoded> {
         self.send(Message::Firewall(firewall::Request::GetRule(idx)))
             .await;
         let read = self.read().await;

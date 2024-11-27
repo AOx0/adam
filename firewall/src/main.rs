@@ -60,7 +60,7 @@ diesel::table! {
 
 diesel::table! {
     rules (id) {
-        id -> Integer,
+        id -> Binary,
         name -> Text,
         description-> Text,
         rule -> Blob,
@@ -106,7 +106,7 @@ async fn get_db() -> SyncConnectionWrapper<SqliteConnection> {
 #[derive(Serialize, Deserialize, Identifiable, Queryable, Insertable, Selectable)]
 #[diesel(table_name = rules)]
 struct StoredRule {
-    pub id: i32,
+    pub id: [u8; 32],
     pub name: String,
     pub description: String,
     pub rule: Vec<u8>,
@@ -115,7 +115,7 @@ struct StoredRule {
 #[derive(Serialize, Deserialize, Identifiable, Queryable, Insertable, Selectable)]
 #[diesel(table_name = rules)]
 struct StoredRuleRef<'a> {
-    pub id: i32,
+    pub id: [u8; 32],
     pub name: &'a str,
     pub description: &'a str,
     pub rule: &'a [u8],
@@ -383,12 +383,10 @@ async fn handle_message(
                 Array::try_from(guard.map_mut("FIREWALL_RULES").unwrap()).unwrap();
 
             ControlFlow::Continue(match msg {
-                Request::DisableRule(MAX_RULES..)
-                | Request::EnableRule(MAX_RULES..)
-                | Request::ToggleRule(MAX_RULES..) => {
+                Request::DisableRule(_) | Request::EnableRule(_) | Request::ToggleRule(_) => {
                     Some(Response::RuleChange(RuleChange::NoSuchRule))
                 }
-                Request::DeleteRule(MAX_RULES..) | Request::GetRule(MAX_RULES..) => None, // Ignore out of bounds rules
+                Request::DeleteRule(_) | Request::GetRule(_) => None, // Ignore out of bounds rules
                 Request::AddRule(meta) => {
                     let mut rule = meta.rule;
 
@@ -398,7 +396,7 @@ async fn handle_message(
                     'res: {
                         for idx in 0..MAX_RULES {
                             if let Ok(Rule { init: false, .. }) = config.get(&idx, 0) {
-                                rule.id = idx;
+                                let rule_id = blake3::hash(&bincode::serialize(&rule).unwrap()).as_bytes().clone();
                                 config.set(idx, rule, 0).unwrap();
                                 let mut db = get_db().await;
                                 let mut buffer = [0u8; std::mem::size_of::<Rule>()];
@@ -406,7 +404,7 @@ async fn handle_message(
                                 bincode::serialize_into(&mut buffer[..], &rule).unwrap();
                                 diesel::insert_into(rules::table)
                                     .values(StoredRuleRef {
-                                        id: idx as i32,
+                                        id: rule_id,
                                         rule: &buffer,
                                         name: &meta.name,
                                         description: &meta.description,
@@ -415,14 +413,14 @@ async fn handle_message(
                                     .await
                                     .unwrap();
 
-                                break 'res Some(Response::Id(idx));
+                                break 'res Some(Response::Id(rule_id));
                             }
                         }
 
                         Some(Response::ListFull)
                     }
                 }
-                Request::DeleteRule(idx @ 0..MAX_RULES) => {
+                Request::DeleteRule(_) => {
                     if let Ok(mut rule @ Rule { init: true, .. }) = config.get(&idx, 0) {
                         rule.init = false;
                         let mut db = get_db().await;
@@ -436,9 +434,9 @@ async fn handle_message(
                     }
                     None
                 }
-                action @ Request::EnableRule(idx @ 0..MAX_RULES)
-                | action @ Request::DisableRule(idx @ 0..MAX_RULES)
-                | action @ Request::ToggleRule(idx @ 0..MAX_RULES) => {
+                action @ Request::EnableRule(_)
+                | action @ Request::DisableRule(_)
+                | action @ Request::ToggleRule(_) => {
                     #[derive(PartialEq, Eq)]
                     enum Action {
                         Toggle,
@@ -497,7 +495,7 @@ async fn handle_message(
                         }
                     }
                 }
-                Request::GetRule(idx @ 0..MAX_RULES) => {
+                Request::GetRule(_) => {
                     if let Ok(rule @ Rule { init: true, .. }) = config.get(&idx, 0) {
                         let mut db = get_db().await;
                         let meta = rules::table
