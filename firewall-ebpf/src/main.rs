@@ -86,6 +86,12 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
                     return emit(ctx, rule.action, Some((i, socket_addr)));
                 }
             }
+
+            if let Match::BytesAtPosition { position, value } = rule.matches {
+                if rem.get(position).copied() == Some(value) {
+                    return emit(ctx, rule.action, Some((i, socket_addr)));
+                }
+            }
         }
 
         unsafe { PROCESSOR.tail_call(&ctx, processor::IPV4_TCP).or_drop()? };
