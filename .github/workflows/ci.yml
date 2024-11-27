@@ -71,7 +71,7 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-nextest
-      - run: just build-release
+      - run: just build --release
       - name: Upload Release Binaries
         uses: actions/upload-artifact@v3
         with:

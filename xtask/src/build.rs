@@ -15,9 +15,6 @@ pub struct Options {
     /// Build and run the release target
     #[clap(long)]
     pub release: bool,
-    /// Produce binaries on release/tag
-    #[clap(long)]
-    pub produce_binaries: bool,
 }
 
 /// Build the project
@@ -42,19 +39,9 @@ pub fn build(opts: Options) -> Result<(), anyhow::Error> {
         target: opts.bpf_target,
         release: opts.release,
         name: format!("{}-ebpf", opts.name),
-        produce_binaries: opts.produce_binaries,
     })
     .context("Error while building eBPF program")?;
     build_project(&opts).context("Error while building userspace application")?;
-
-    if opts.produce_binaries {
-        let status = Command::new("cargo")
-            .arg("build")
-            .arg("--release")
-            .status()
-            .expect("failed to produce binaries");
-        assert!(status.success());
-    }
 
     Ok(())
 }
