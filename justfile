@@ -43,3 +43,8 @@ build-controller flags='':
 [positional-arguments]
 build-firewall flags='':
     RUST_LOG=info cargo xtask build firewall $@
+
+## Build release
+[positional-arguments]
+build-release:
+    RUST_LOG=info cargo build --release

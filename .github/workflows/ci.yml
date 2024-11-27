@@ -5,6 +5,9 @@ on:
     branches:
       - main
   pull_request:
+  release:
+    types: [created]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -39,3 +42,39 @@ jobs:
           crate: cargo-nextest
       - run: just build-firewall
       - run: cargo nextest run
+
+  produce_binaries:
+    name: Produce Binaries
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install lld
+        run: sudo apt-get install -y lld
+      - name: Setup Rust
+        run: |
+          rustup update nightly && rustup default nightly
+          rustup component add rustc-codegen-cranelift-preview --toolchain nightly
+      - name: Install Tailwind CSS
+        run: |
+          wget -q https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.15/tailwindcss-linux-x64 -O /usr/local/bin/tailwindcss
+          chmod +x /usr/local/bin/tailwindcss
+      - name: Install just
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: just
+      - name: Install bpf-linker
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: bpf-linker
+      - name: Install cargo-nextest
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-nextest
+      - run: just build-release
+      - name: Upload Release Binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-binaries
+          path: |
+            ./target/release/
