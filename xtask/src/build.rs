@@ -42,6 +42,7 @@ pub fn build(opts: Options) -> Result<(), anyhow::Error> {
         target: opts.bpf_target,
         release: opts.release,
         name: format!("{}-ebpf", opts.name),
+        produce_binaries: opts.produce_binaries,
     })
     .context("Error while building eBPF program")?;
     build_project(&opts).context("Error while building userspace application")?;
