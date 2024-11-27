@@ -39,9 +39,6 @@ pub struct Options {
     /// Build the release target
     #[clap(long)]
     pub release: bool,
-    /// Produce binaries on release/tag
-    #[clap(long)]
-    pub produce_binaries: bool,
 }
 
 pub fn build_ebpf(opts: Options) -> Result<(), anyhow::Error> {
@@ -63,15 +60,6 @@ pub fn build_ebpf(opts: Options) -> Result<(), anyhow::Error> {
         .status()
         .expect("failed to build bpf program");
     assert!(status.success());
-
-    if opts.produce_binaries {
-        let status = Command::new("cargo")
-            .arg("build")
-            .arg("--release")
-            .status()
-            .expect("failed to produce binaries");
-        assert!(status.success());
-    }
 
     Ok(())
 }
