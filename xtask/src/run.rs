@@ -18,9 +18,6 @@ pub struct Options {
     /// Build and run the release target
     #[clap(long)]
     pub release: bool,
-    /// Produce binaries on release/tag
-    #[clap(long)]
-    pub produce_binaries: bool,
     /// The command used to wrap your application
     #[clap(short, long, default_value = "sudo -E")]
     pub runner: String,
@@ -36,7 +33,6 @@ pub fn run(opts: Options) -> Result<(), anyhow::Error> {
         bpf_target: opts.bpf_target,
         release: opts.release,
         name: opts.name.clone(),
-        produce_binaries: opts.produce_binaries,
     })
     .context("Error while building project")?;
 
