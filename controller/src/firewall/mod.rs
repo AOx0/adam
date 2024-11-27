@@ -14,6 +14,7 @@ use message::{
     EventQuery, Message,
 };
 use tokio::net::UnixStream;
+use axum_login::AuthLayer;
 
 use crate::{htmx::Htmx, AppState};
 
@@ -69,6 +70,7 @@ pub fn router() -> Router<AppState> {
         .nest("/rules", rules)
         .nest("/state", state)
         .nest("/events", events)
+        .layer(AuthLayer::new())
 }
 
 #[derive(Debug)]

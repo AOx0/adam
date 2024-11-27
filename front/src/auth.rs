@@ -4,6 +4,7 @@ use crate::state::Context;
 use axum::{async_trait, extract::FromRequestParts, http::request::Parts, RequestPartsExt};
 use axum_extra::extract::PrivateCookieJar;
 use surrealdb::sql::Thing;
+use axum_login::AuthLayer;
 
 #[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Session {
