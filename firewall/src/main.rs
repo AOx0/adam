@@ -594,6 +594,33 @@ async fn handle_message(
 
                     Some(Response::Events(b))
                 }
+                Request::UpdateRule(id, new_rule) => {
+                    if let Ok(mut rule @ Rule { init: true, .. }) = config.get(&id, 0) {
+                        rule = new_rule.rule;
+                        rule.id = id;
+                        config.set(id, rule, 0).unwrap();
+
+                        let mut db = get_db().await;
+                        diesel::update(rules::table.filter(rules::dsl::id.eq(id as i32)))
+                            .set((
+                                rules::dsl::name.eq(new_rule.name),
+                                rules::dsl::description.eq(new_rule.description),
+                                rules::dsl::rule.eq(bincode::serialize(&rule).unwrap()),
+                            ))
+                            .execute(&mut db)
+                            .await
+                            .unwrap();
+
+                        Some(Response::UpdateRule(StoredRuleDecoded {
+                            id: rule.id as i32,
+                            name: new_rule.name,
+                            description: new_rule.description,
+                            rule,
+                        }))
+                    } else {
+                        Some(Response::DoesNotExist)
+                    }
+                }
             })
         }
         Message::Halt => {
