@@ -42,5 +42,6 @@ pub fn build(opts: Options) -> Result<(), anyhow::Error> {
     })
     .context("Error while building eBPF program")?;
     build_project(&opts).context("Error while building userspace application")?;
+
     Ok(())
 }

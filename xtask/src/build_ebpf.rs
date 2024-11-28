@@ -60,5 +60,6 @@ pub fn build_ebpf(opts: Options) -> Result<(), anyhow::Error> {
         .status()
         .expect("failed to build bpf program");
     assert!(status.success());
+
     Ok(())
 }
