@@ -84,9 +84,9 @@ jobs:
           bins=$(cargo run --bin 2>&1 | grep '    ' | sed -r 's/^\s+//' | grep -v xtask)
           paths=""
           for bin in $bins; do
-            paths="${paths}./target/release/${bin},"
+            paths="${paths}./target/release/${bin} "
           done
-          paths="${paths% }"
+          paths="${paths%}"
           echo "paths=${paths}" >> $GITHUB_OUTPUT
       - name: Upload Release Binaries
         uses: actions/upload-artifact@v4
