@@ -81,14 +81,15 @@ jobs:
       - name: Get Binary List
         id: binlist
         run: |
-          BINS=$(cargo run --bin 2>&1 | grep '    ' | sed -r 's/^\s+//' | grep -v xtask)
-          PATHS=""
-          for bin in $BINS; do
-            PATHS="$PATHS\n            ./target/release/$bin"
+          bins=$(cargo run --bin 2>&1 | grep '    ' | sed -r 's/^\s+//' | grep -v xtask)
+          paths=""
+          for bin in $bins; do
+            paths="${paths}./target/release/${bin},"
           done
-          echo "paths=$PATHS" >> $GITHUB_OUTPUT
+          paths="${paths% }"
+          echo "paths=${paths}" >> $github_output
       - name: Upload Release Binaries
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: release-binaries
           path: ${{ steps.binlist.outputs.paths }}
