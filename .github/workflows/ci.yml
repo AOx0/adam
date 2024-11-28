@@ -79,13 +79,13 @@ jobs:
           rustup component add rustc-codegen-cranelift-preview --toolchain nightly
       - run: just build --release
       - name: Get Binary List
-        id: binlist
         run: |
-          bins=$(cargo run --bin 2>&1 | grep '    ' | sed -r 's/^\s+//' | grep -v xtask | tr '\n' ',' | sed 's/,$//')
-          paths="./target/release/{${bins}}"
-          echo "paths=${paths}" >> $GITHUB_OUTPUT
+          mkdir -p target/release/binaries
+          for bin in $(cargo run --bin 2>&1 | grep '    ' | sed -r 's/^\s+//' | grep -v xtask ); do
+            cp "./target/release/$bin" "./target/release/binaries/"
+          done
       - name: Upload Release Binaries
         uses: actions/upload-artifact@v4
         with:
           name: release-binaries
-          path: ${{ steps.binlist.outputs.paths }}
+          path: "./target/release/binaries/*"
