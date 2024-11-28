@@ -72,11 +72,17 @@ jobs:
         with:
           crate: cargo-nextest
       - run: just build --release
+      - name: Get Binary List
+        id: binlist
+        run: |
+          BINS=$(cargo run --bin 2>&1 | sed -r 's/^\s+//' | grep -v xtask)
+          PATHS=""
+          for bin in $BINS; do
+            PATHS="$PATHS\n            ./target/release/$bin"
+          done
+          echo "paths=$PATHS" >> $GITHUB_OUTPUT
       - name: Upload Release Binaries
         uses: actions/upload-artifact@v3
         with:
           name: release-binaries
-          path: |
-            ./target/release/firewall
-            ./target/release/controller
-            ./target/release/front
+          path: ${{ steps.binlist.outputs.paths }}
