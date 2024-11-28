@@ -77,4 +77,6 @@ jobs:
         with:
           name: release-binaries
           path: |
-            ./target/release/
+            ./target/release/firewall
+            ./target/release/controller
+            ./target/release/front
