@@ -87,7 +87,7 @@ jobs:
             paths="${paths}./target/release/${bin},"
           done
           paths="${paths% }"
-          echo "paths=${paths}" >> $github_output
+          echo "paths=${paths}" >> $GITHUB_OUTPUT
       - name: Upload Release Binaries
         uses: actions/upload-artifact@v4
         with:
