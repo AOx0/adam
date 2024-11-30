@@ -78,14 +78,15 @@ jobs:
           rustup update nightly && rustup default nightly
           rustup component add rustc-codegen-cranelift-preview --toolchain nightly
       - run: just build --release
-      - name: Get Binary List
+      - name: Prepare Binaries for Release
         run: |
           mkdir -p target/release/binaries
           for bin in $(cargo run --bin 2>&1 | grep '    ' | sed -r 's/^\s+//' | grep -v xtask ); do
             cp "./target/release/$bin" "./target/release/binaries/"
           done
-      - name: Upload Release Binaries
-        uses: actions/upload-artifact@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: release-binaries
-          path: "./target/release/binaries/*"
+          files: target/release/binaries/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
