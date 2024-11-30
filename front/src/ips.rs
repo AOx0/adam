@@ -15,7 +15,7 @@ use std::{
     str::FromStr,
 };
 use surrealdb::{opt::PatchOp, sql::Thing};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 #[derive(Debug, Deserialize)]
 struct AddIp {
@@ -42,7 +42,7 @@ pub fn router() -> Router<AppState> {
 }
 
 async fn select_ip(State(s): State<AppState>, Path(id): Path<String>) -> Response {
-    let mut guard = s.selected_ip.lock().await;
+    let mut guard = s.selected_ip.write().await;
 
     let Some(new): Option<Ip> =
         s.db.update(("ips", &id))
@@ -152,7 +152,7 @@ async fn add_ip(State(s): State<AppState>, Form(ip): Form<AddIp>) -> impl IntoRe
 
 // Endpoint to delete an IP
 async fn delete_ip(State(s): State<AppState>, Path(id): Path<String>) -> Response {
-    let mut guard = s.selected_ip.lock().await;
+    let mut guard = s.selected_ip.write().await;
     let _: Option<Ip> = s.db.delete(("ips", &id)).await.unwrap();
 
     let rem: Vec<Ip> = s.db.select("ips").await.unwrap();
