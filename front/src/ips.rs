@@ -54,7 +54,7 @@ async fn select_ip(State(s): State<AppState>, Path(id): Path<String>) -> Respons
     };
 
     if let Some(Ip { id, .. }) = guard.as_ref()
-        && id != &new.id
+        && id != new.id
     {
         let _: Option<Ip> =
             s.db.update(("ips", id.id.to_string()))
