@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Response {
-    Id(u32),
+    Id([u8; 32]),
     ListFull,
     Rules(Vec<firewall_common::StoredRuleDecoded>),
     Rule(firewall_common::StoredRuleDecoded),
@@ -52,11 +52,11 @@ pub enum Status {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Request {
     AddRule(firewall_common::StoredRuleDecoded),
-    DeleteRule(u32),
-    EnableRule(u32),
-    DisableRule(u32),
-    ToggleRule(u32),
-    GetRule(u32),
+    DeleteRule([u8; 32]),
+    EnableRule([u8; 32]),
+    DisableRule([u8; 32]),
+    ToggleRule([u8; 32]),
+    GetRule([u8; 32]),
     GetRules,
     Status,
     GetEvents(crate::EventQuery),

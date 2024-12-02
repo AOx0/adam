@@ -16,7 +16,7 @@ use netp::network::InetProtocol;
 pub enum Event {
     Pass,
     Blocked {
-        rule: u32,
+        rule: [u8; 32],
         addr: core::net::SocketAddr,
     },
 }
@@ -55,16 +55,11 @@ pub enum Direction {
 #[cfg_attr(feature = "serde", serde(rename_all = "snake_case"))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Rule {
-    /// id is set by the firewall controller when adding the new rule
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub id: u32,
     pub action: Action,
     pub matches: Match,
     pub applies_to: Direction,
-    /// All rules are disabled by default
     #[cfg_attr(feature = "serde", serde(default))]
     pub enabled: bool,
-    /// All added rules are marked as initialized
     #[cfg_attr(feature = "serde", serde(default))]
     pub init: bool,
 }
@@ -74,9 +69,7 @@ pub struct Rule {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StoredRuleDecoded {
-    /// id is set by the firewall controller when adding the new rule
-    #[cfg_attr(feature = "serde", serde(default))]
-    pub id: i32,
+    pub id: [u8; 32],
     pub name: String,
     pub description: String,
     pub rule: Rule,
