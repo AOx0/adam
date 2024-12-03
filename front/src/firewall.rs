@@ -107,7 +107,13 @@ async fn rules(
         RuleQuery {
             all: Some(true), ..
         } => EventQuery::All,
-        _ => EventQuery::Since(chrono::Local::now().naive_local()),
+        _ => EventQuery::Since(
+            chrono::Local::now()
+                .naive_local()
+                .date()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+        ),
     };
 
     let events = reqwest::Client::new()
@@ -152,9 +158,9 @@ async fn rules(
 
         div #(id) .w-full {}
 
-        script { (PreEscaped(include_str!("./firewall_events.js"))) }
+        script #firewall-script async { (PreEscaped(include_str!("./firewall_events.js"))) }
         div x-data=(PreEscaped(format!(r#"{{ raw_data: {}, ip: '{}' }}"#, events, ip)))
-            x-init=(PreEscaped(format!("setupFirewallChart(raw_data, ip, '{}')", id)))
+            x-init=(PreEscaped(format!("document.getElementById('firewall-script').onload = () => setupFirewallChart(raw_data, ip, '{}')", id)))
         {}
 
         table .table-auto .text-left .border-separate .w-full {
