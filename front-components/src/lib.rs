@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use maud::{html, Markup};
 
 #[allow(non_snake_case)]
@@ -67,22 +69,23 @@ pub fn Warning(msg: &str) -> Markup {
     }
 }
 
-pub fn rule_status(enabled: bool, id: u32) -> Markup {
+#[allow(non_snake_case)]
+pub fn RuleStatus(enabled: bool, id: u32, ip: SocketAddr) -> Markup {
     html! {
-        @let color = { if enabled { "lime" } else { "rose" } };
+        @let color = { if enabled { "[#69b3a2]" } else { "[#ff6347]" } };
         @let text = { if enabled { "Enabled" } else { "Disabled" } };
 
         // Trigger tailwindcss
-        // bg-rose-200 border-rose-800 text-rose-800
-        // bg-lime-200 border-lime-800 text-lime-800
-        // dark:bg-rose-500/10 dark:border-rose-500 dark:text-rose-500
-        // dark:bg-lime-500/10 dark:border-lime-500 dark:text-lime-500
+        // bg-[#ff6347]/30 border-[#ff6347] text-[#ff6347]
+        // bg-[#69b3a2]/30 border-[#69b3a2] text-[#69b3a2]
+        // dark:bg-[#ff6347]/30 dark:border-[#ff6347] dark:text-[#ff6347]
+        // dark:bg-[#69b3a2]/30 dark:border-[#69b3a2] dark:text-[#69b3a2]
         button
-            hx-post={ "http://127.0.0.1:9988/firewall/rules/" (id) "/toggle" }
+            hx-post={ "http://" (ip) "/firewall/rules/" (id) "/toggle" }
             hx-swap="outerHTML"
-            .{ "bg-"(color)"-200" } .{ "dark:bg-"(color)"-500/10" }
-            .{ "border-"(color)"-800" } .{ "dark:border-"(color)"-500" }
-            .{ "text-"(color)"-800" } .{ "dark:text-"(color)"-500" }
+            .{ "bg-"(color)"/30" } .{ "dark:bg-"(color)"/30" }
+            .{ "border-"(color) } .{ "dark:border-"(color) }
+            .{ "text-"(color) } .{ "dark:text-"(color) }
             .border.rounded-full
             .px-2
             .text-sm
@@ -90,20 +93,26 @@ pub fn rule_status(enabled: bool, id: u32) -> Markup {
     }
 }
 
-pub fn status(enabled: bool, toggle_url: &str) -> Markup {
+#[allow(non_snake_case)]
+pub fn Status(enabled: bool, toggle_url: &str) -> Markup {
     html! {
-        @let color = { if enabled { "lime" } else { "rose" } };
+        @let color = { if enabled { "[#69b3a2]" } else { "[#ff6347]" } };
         @let text = { if enabled { "Enabled" } else { "Disabled" } };
 
         button
             hx-post=(toggle_url)
             hx-swap="outerHTML"
-            .{ "bg-"(color)"-200" } .{ "dark:bg-"(color)"-500/10" }
-            .{ "border-"(color)"-800" } .{ "dark:border-"(color)"-500" }
-            .{ "text-"(color)"-800" } .{ "dark:text-"(color)"-500" }
+            .{ "bg-"(color)"/30" } .{ "dark:bg-"(color)"/30" }
+            .{ "border-"(color) } .{ "dark:border-"(color) }
+            .{ "text-"(color) } .{ "dark:text-"(color) }
             .border.rounded-full
             .px-2
             .text-sm
             { (text) }
     }
+}
+
+#[allow(non_snake_case)]
+pub fn FirewallStatus(enabled: bool, ip: SocketAddr) -> Markup {
+    Status(enabled, &format!("http://{ip}/firewall/state/toggle"))
 }

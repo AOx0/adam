@@ -1,5 +1,7 @@
+use std::{net::SocketAddr, str::FromStr};
+
 use axum::{
-    extract::{ws::WebSocket, Path, State, WebSocketUpgrade},
+    extract::{ws::WebSocket, Path, Request, State, WebSocketUpgrade},
     response::{IntoResponse, Response},
     routing, Json, Router,
 };
@@ -83,15 +85,12 @@ pub async fn query_events(
     Json(s.firewall_pool.get().await.unwrap().get_events(query).await)
 }
 
-pub async fn status(htmx: Htmx, State(state): State<AppState>) -> impl IntoResponse {
+pub async fn status(htmx: Htmx, State(state): State<AppState>, req: Request) -> impl IntoResponse {
     let status = state.firewall_pool.get().await.unwrap().status().await;
+    let ip = SocketAddr::from_str(req.headers().get("host").unwrap().to_str().unwrap()).unwrap();
 
     if htmx.enabled() {
-        front_components::status(
-            status == Status::Running,
-            "http://127.0.0.1:9988/firewall/state/toggle",
-        )
-        .into_response()
+        front_components::FirewallStatus(status == Status::Running, ip).into_response()
     } else {
         Json(status).into_response()
     }
@@ -130,7 +129,10 @@ pub async fn event_dispatcher(mut socket: WebSocket) {
             ))
             .await
         {
-            panic!("WebSocket send error: {}", e);
+            match e.to_string() {
+                s if s.contains("Broken pipe") => break,
+                _ => panic!("WebSocket send error: {}", e),
+            }
         }
     }
 }
@@ -155,6 +157,7 @@ pub async fn toggle(
     htmx: Htmx,
     State(s): State<AppState>,
     Path((idx,)): Path<(u32,)>,
+    req: Request,
 ) -> Result<Markup, ()> {
     let change = s.firewall_pool.get().await.unwrap().toggle(idx).await;
 
@@ -163,16 +166,18 @@ pub async fn toggle(
         firewall::RuleChange::NoChangeRequired(rule_status) => Some(rule_status),
         firewall::RuleChange::Change(rule_status) => Some(rule_status),
     };
+    let ip = SocketAddr::from_str(req.headers().get("host").unwrap().to_str().unwrap()).unwrap();
 
     htmx.enabled()
         .then_some({
             status.map(|s| {
-                front_components::rule_status(
+                front_components::RuleStatus(
                     match s {
                         firewall::RuleStatus::Active => true,
                         firewall::RuleStatus::Inactive => false,
                     },
                     idx,
+                    ip,
                 )
             })
         })
@@ -204,7 +209,11 @@ pub async fn start(State(s): State<AppState>) {
     s.firewall_pool.get().await.unwrap().start().await;
 }
 
-pub async fn toggle_fire(htmx: Htmx, State(s): State<AppState>) -> Result<impl IntoResponse, ()> {
+pub async fn toggle_fire(
+    htmx: Htmx,
+    State(s): State<AppState>,
+    req: Request,
+) -> Result<impl IntoResponse, ()> {
     let status = s.firewall_pool.get().await.unwrap().status().await;
 
     match status {
@@ -212,14 +221,10 @@ pub async fn toggle_fire(htmx: Htmx, State(s): State<AppState>) -> Result<impl I
         Status::Running => s.firewall_pool.get().await.unwrap().halt().await,
     }
 
+    let ip = SocketAddr::from_str(req.headers().get("host").unwrap().to_str().unwrap()).unwrap();
+
     htmx.enabled()
-        .then(|| {
-            front_components::status(
-                status != Status::Running,
-                "http://127.0.0.1:9988/firewall/state/toggle", // This is probably wrong
-            )
-            .into_response()
-        })
+        .then(|| front_components::FirewallStatus(status != Status::Running, ip).into_response())
         .ok_or(())
 }
 

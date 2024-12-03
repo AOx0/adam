@@ -138,6 +138,7 @@ async fn Template(
                 script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" {}
                 link href="/styles.css" rel="stylesheet";
                 script src="https://unpkg.com/htmx.org" {}
+                script src="https://d3js.org/d3.v6.min.js" {}
                 script src="https://unpkg.com/htmx-ext-head-support/head-support.js" {}
                 script {
                     "
@@ -209,7 +210,7 @@ async fn Template(
                                 form {
                                     label for="ip-select" { "Select IP: " }
                                     select
-                                        ."dark:text-background"
+                                        ."dark:[color-scheme:dark]"
                                         .px-2
                                         .ml-2
                                         .rounded
