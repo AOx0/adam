@@ -84,29 +84,12 @@ async fn add_ip_home(templ: Template, req: Request) -> Markup {
             }
             (Padded(html! {
                 form .flex .flex-col ."w-1/2" .space-y-2 method="post" action="/ips/add" {
-                    div {
-                        label for="name" { "Name:" }
-                        input .ml-2 type="text" id="name" name="name" required;
-                    }
+                    (TextInput("Name:", "text", "name", "name", true, None))
+                    (TextInput("Description:", "text", "description", "description", true, None))
+                    (TextInput("IP Address:", "text", "address", "address", true, None))
+                    (TextInput("Port:", "number", "port", "port", true, Some("9988")))
 
-                    div {
-                        label for="description" { "Description:" }
-                        input .ml-2 type="text" id="description" name="description" required;
-                    }
-
-                    div {
-                        label for="address" { "IP Address:" }
-                        input .ml-2 type="text" id="address" name="address" required;
-                    }
-
-                    div {
-                        label for="port" { "Port:" }
-                        input .ml-2 type="number" id="port" name="port" value="9988" required;
-                    }
-
-                    div {
-                        button .font-bold type="submit" { "Add IP" }
-                    }
+                    (FormButton(html!{ p .font-bold { "Add IP" } }, "submit"))
                 }
             }))
         })
@@ -191,62 +174,89 @@ async fn ips_home(templ: Template, State(state): State<AppState>) -> Markup {
                             window.location.href = window.location.href;
                         });
                     }
-                """#))                
-            }
-            div .flex.flex-row .justify-between {
-                h1 .text-xl .font-bold { "Stored IPs" }
-
-                a href="/ips/add"
-                    .bg-foreground.text-background
-                    ."hover:bg-foreground/75"
-                    .rounded
-                    .px-2.py-1
-                    .font-bold
-                    { "Add IP" }
+                """#))
             }
 
-            table .table-auto .text-left .border-separate {
-                thead {
-                    tr {
-                        th .pl-8 { "ID" }
-                        th .pl-8 { "Name" }
-                        th .pl-8 { "Description" }
-                        th .pl-8 { "Socket Addr" }
-                        th .pl-8 { "Selected" }
-                        th .pl-8 { "Action" }
-                    }
+            div x-data="{ open: false }" {
+                div .flex.flex-row .justify-between {
+                    h1 .text-xl .font-bold { "Stored IPs" }
+
+                    button
+                        .bg-foreground.text-background
+                        ."hover:bg-foreground/75"
+                        .rounded
+                        .px-2.py-1
+                        .font-bold
+                        "@click"="open = !open"
+                        { "Add IP" }
                 }
-                tbody {
-                    @for ip in ips {
+
+                table .table-auto .text-left .border-separate .w-full {
+                    thead {
                         tr {
-                            td .pl-8 { code { (ip.id.id) } }
-                            td .pl-8 { (ip.name) }
-                            td .pl-8 { (ip.description) }
-                            td .pl-8 { (ip.socket) }
-                            td .pl-8 { (ip.selected) }
-                            td .pl-8 .space-x-5 {
-                                button
-                                    .text-sm
-                                    .text-foreground.transition-colors
-                                    hx-delete={ "/ips/" (ip.id.id) }
-                                    hx-target="closest tr"
-                                {
-                                    p."hover:text-foreground/80"."text-foreground/60"
-                                    { "Delete" }
+                            th .pl-8 { "ID" }
+                            th .pl-8 { "Name" }
+                            th .pl-8 { "Description" }
+                            th .pl-8 { "Socket Addr" }
+                            th .pl-8 { "Selected" }
+                            th .pl-8 { "Action" }
+                        }
+                    }
+                    tbody {
+                        tr x-show="open" {
+                            form method="post" action="/ips/add" x-ref="form" {
+                                td .pl-8 { "-" }
+                                td .pl-8 { input type="text" name="name" .px-1 ."bg-foreground/5" .outline-none {} }
+                                td .pl-8 { input type="text" name="description" .px-1 ."bg-foreground/5" .outline-none {} }
+                                td .pl-8 {
+                                    input type="text" name="address" .px-1 .w-32 ."bg-foreground/5" .outline-none {}
+                                    input type="number" name="port" value="9988" .px-1 .w-20 .ml-2 ."bg-foreground/5" .outline-none {}
                                 }
+                                td .pl-8 { "-" }
+                                td .pl-8 {
+                                    button
+                                        .text-sm
+                                        .text-foreground.transition-colors
+                                        type="submit"
+                                        "@click"="$refs.form.submit()"
+                                    {
+                                        p."hover:text-foreground/80"."text-foreground/60"
+                                        { "Add" }
+                                    }
+                                }
+                            }
+                        }
+                        @for ip in ips {
+                            tr {
+                                td .pl-8 { code { (ip.id.id) } }
+                                td .pl-8 { (ip.name) }
+                                td .pl-8 { (ip.description) }
+                                td .pl-8 { (ip.socket) }
+                                td .pl-8 { (ip.selected) }
+                                td .pl-8 .space-x-5 {
+                                    button
+                                        .text-sm
+                                        .text-foreground.transition-colors
+                                        hx-delete={ "/ips/" (ip.id.id) }
+                                        hx-target="closest tr"
+                                    {
+                                        p."hover:text-foreground/80"."text-foreground/60"
+                                        { "Delete" }
+                                    }
 
-                                button
-                                    .text-sm
-                                    .text-foreground.transition-colors
-                                    onclick={"select_ip(\"/ips/" (ip.id.id) "\")"}
-                                    // hx-patch={ "/ips/" (ip.id.id) }
+                                    button
+                                        .text-sm
+                                        .text-foreground.transition-colors
+                                        onclick={"select_ip(\"/ips/" (ip.id.id) "\")"}
+                                        // hx-patch={ "/ips/" (ip.id.id) }
 
 
-                                    // hx-swap="none"
-                                    // hx-target="closest body"
-                                {
-                                    p."hover:text-foreground/80"."text-foreground/60"
-                                    { "Select" }
+                                        // hx-swap="none"
+                                        // hx-target="closest body"
+                                    {
+                                        p."hover:text-foreground/80"."text-foreground/60"
+                                        { "Select" }
+                                    }
                                 }
                             }
                         }

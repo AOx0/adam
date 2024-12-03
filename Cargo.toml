@@ -1,7 +1,16 @@
 cargo-features = ["codegen-backend"]
 
 [workspace]
-members = ["xtask", "firewall", "firewall-common", "controller", "message", "netp", "front", "front-components"]
+members = [
+    "xtask",
+    "firewall",
+    "firewall-common",
+    "controller",
+    "message",
+    "netp",
+    "front",
+    "front-components",
+]
 resolver = "2"
 
 [workspace.dependencies]

@@ -748,6 +748,14 @@ video {
   width: 3rem;
 }
 
+.w-20 {
+  width: 5rem;
+}
+
+.w-32 {
+  width: 8rem;
+}
+
 .w-5 {
   width: 1.25rem;
 }
@@ -866,8 +874,16 @@ video {
   border-color: rgb(255 99 71 / var(--tw-border-opacity));
 }
 
+.border-background\/10 {
+  border-color: hsl(var(--background) / 0.1);
+}
+
 .border-foreground {
   border-color: hsl(var(--foreground));
+}
+
+.border-foreground\/70 {
+  border-color: hsl(var(--foreground) / 0.7);
 }
 
 .border-zinc-100\/95 {
@@ -892,6 +908,10 @@ video {
 
 .bg-foreground {
   background-color: hsl(var(--foreground));
+}
+
+.bg-foreground\/5 {
+  background-color: hsl(var(--foreground) / 0.05);
 }
 
 .bg-red-500 {
@@ -920,9 +940,19 @@ video {
   padding: 2rem;
 }
 
+.px-1 {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+
 .px-2 {
   padding-left: 0.5rem;
   padding-right: 0.5rem;
+}
+
+.px-3 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
 }
 
 .px-4 {
@@ -1057,6 +1087,11 @@ video {
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
 
+.outline-none {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
 .invert {
   --tw-invert: invert(100%);
   filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
@@ -1097,6 +1132,10 @@ video {
   transition-duration: 300ms;
 }
 
+.hover\:bg-foreground\/70:hover {
+  background-color: hsl(var(--foreground) / 0.7);
+}
+
 .hover\:bg-foreground\/75:hover {
   background-color: hsl(var(--foreground) / 0.75);
 }
@@ -1121,6 +1160,26 @@ video {
 .focus\:outline-none:focus {
   outline: 2px solid transparent;
   outline-offset: 2px;
+}
+
+.focus\:ring:focus {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(3px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+.focus\:ring-2:focus {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+.focus\:ring-background\/20:focus {
+  --tw-ring-color: hsl(var(--background) / 0.2);
+}
+
+.focus\:ring-foreground:focus {
+  --tw-ring-color: hsl(var(--foreground));
 }
 
 @supports ((-webkit-backdrop-filter: var(--tw)) or (backdrop-filter: var(--tw))) {

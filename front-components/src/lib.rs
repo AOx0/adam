@@ -28,6 +28,52 @@ pub fn Padded(content: Markup) -> Markup {
 }
 
 #[allow(non_snake_case)]
+pub fn FormButton(text: impl maud::Render, r#type: &str) -> Markup {
+    html! {
+        button
+            .text-background
+            .bg-foreground
+            .border."border-background/10"
+            .rounded-md
+            .px-4.py-2
+            .text-sm.font-medium
+            .transition-colors
+            ."hover:bg-foreground/70"
+            ."focus:outline-none"."focus:ring-2"."focus:ring-background/20"
+            type=(r#type)
+        {
+            (text)
+        }
+    }
+}
+
+#[allow(non_snake_case)]
+pub fn TextInput(
+    label: impl maud::Render,
+    r#type: &str,
+    id: &str,
+    name: &str,
+    required: bool,
+    value: Option<&str>,
+) -> Markup {
+    html! {
+        div."flex"."flex-col"."space-y-2" {
+            label."text-sm"."font-medium"."text-foreground/60" for=(id) { (label) }
+            input
+                ."w-full"."px-3"."py-2"
+                ."rounded-md"."border"."border-foreground/70"
+                ."bg-background"."text-foreground"
+                ."focus:outline-none"."focus:ring"."focus:ring-foreground"
+                type=(r#type)
+                id=(id)
+                name=(name)
+                required[required]
+                value=[value];
+        }
+    }
+}
+
+#[allow(non_snake_case)]
 pub fn Error(msg: &str) -> Markup {
     html! {
         div."w-full"."text-white"."bg-red-500" {
