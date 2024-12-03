@@ -1,11 +1,15 @@
 /** @type {import('tailwindcss').Config} */
-const colors = require('tailwindcss/colors')
+const colors = require("tailwindcss/colors");
 
 module.exports = {
-  darkMode: 'class',
+  darkMode: "class",
   content: {
     relative: true,
-    files: ["./front/src/**/*.{js,rs}", "./front-components/src/**/*.{js,rs}", "./controller/src/**/*.{js,rs}"]
+    files: [
+      "./front/src/**/*.{js,rs}",
+      "./front-components/src/**/*.{js,rs}",
+      "./controller/src/**/*.{js,rs}",
+    ],
   },
   theme: {
     extend: {
@@ -25,10 +29,10 @@ module.exports = {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
         },
-        transparent: 'transparent',
-        ...colors
+        transparent: "transparent",
+        ...colors,
       },
     },
   },
   plugins: [],
-}
+};
