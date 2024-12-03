@@ -210,7 +210,7 @@ async fn Template(
                                 form {
                                     label for="ip-select" { "Select IP: " }
                                     select
-                                        ."dark:text-background"
+                                        ."dark:[color-scheme:dark]"
                                         .px-2
                                         .ml-2
                                         .rounded

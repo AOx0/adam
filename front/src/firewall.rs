@@ -79,6 +79,7 @@ async fn rule(
 struct RuleQuery {
     since_datetime: Option<chrono::NaiveDateTime>,
     since_date: Option<chrono::NaiveDate>,
+    all: Option<bool>,
 }
 
 async fn rules(
@@ -103,7 +104,10 @@ async fn rules(
             since_date: Some(since_date),
             ..
         } => EventQuery::Since(since_date.and_hms_opt(0, 0, 0).unwrap()),
-        _ => EventQuery::All,
+        RuleQuery {
+            all: Some(true), ..
+        } => EventQuery::All,
+        _ => EventQuery::Since(chrono::Local::now().naive_local()),
     };
 
     let events = reqwest::Client::new()

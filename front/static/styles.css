@@ -1173,10 +1173,6 @@ video {
   color: rgb(255 99 71 / var(--tw-text-opacity));
 }
 
-.dark\:text-background:is(.dark *) {
-  color: hsl(var(--background));
-}
-
 .dark\:text-gray-200:is(.dark *) {
   --tw-text-opacity: 1;
   color: rgb(229 231 235 / var(--tw-text-opacity));
