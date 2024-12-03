@@ -1,12 +1,13 @@
 use std::net::SocketAddr;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     routing::get,
     Router,
 };
 use front_components::*;
 use maud::{html, Markup, PreEscaped};
+use message::EventQuery;
 use rand::RngCore;
 
 use crate::{ips::Ip, sip::Selected, template::Template, AppState};
@@ -74,10 +75,17 @@ async fn rule(
         .await
 }
 
+#[derive(serde::Deserialize)]
+struct RuleQuery {
+    since_datetime: Option<chrono::NaiveDateTime>,
+    since_date: Option<chrono::NaiveDate>,
+}
+
 async fn rules(
     templ: Template,
     State(s): State<AppState>,
     Selected(Ip { socket: ip, .. }): Selected,
+    Query(q): Query<RuleQuery>,
 ) -> Markup {
     let res = reqwest::get(format!("http://{ip}/firewall/rules"))
         .await
@@ -86,10 +94,22 @@ async fn rules(
     let rules: Vec<firewall_common::StoredRuleDecoded> =
         serde_json::from_str(&res.text().await.unwrap()).unwrap();
 
+    let query = match q {
+        RuleQuery {
+            since_datetime: Some(since_datetime),
+            ..
+        } => EventQuery::Since(since_datetime),
+        RuleQuery {
+            since_date: Some(since_date),
+            ..
+        } => EventQuery::Since(since_date.and_hms_opt(0, 0, 0).unwrap()),
+        _ => EventQuery::All,
+    };
+
     let events = reqwest::Client::new()
         .get(format!("http://{ip}/firewall/events/query"))
         .header("Content-Type", "application/json")
-        .body("\"all\"")
+        .body(serde_json::to_string(&query).unwrap())
         .send()
         .await
         .unwrap()
