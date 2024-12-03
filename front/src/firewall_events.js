@@ -1,4 +1,4 @@
-function setupFirewallChart(raw_data, ip) {
+function setupFirewallChart(raw_data, ip, id) {
   /**
    * @typedef {import('d3')} d3
    */
@@ -7,9 +7,7 @@ function setupFirewallChart(raw_data, ip) {
   const margin = { top: 10, right: 30, bottom: 30, left: 60 };
 
   const width =
-    document.getElementById("chart-container").offsetWidth -
-    margin.left -
-    margin.right;
+    document.getElementById(id).offsetWidth - margin.left - margin.right;
   const height = 300 - margin.top - margin.bottom;
 
   // append the svg object to the body of the page
@@ -17,7 +15,7 @@ function setupFirewallChart(raw_data, ip) {
    * @type {d3.Selection}
    */
   const svg = d3
-    .select("#chart-container")
+    .select(`#${id}`)
     .append("svg")
     .attr("width", width + margin.left + margin.right)
     .attr("height", height + margin.top + margin.bottom)
@@ -186,7 +184,7 @@ function setupFirewallChart(raw_data, ip) {
 
   // Add tooltip
   const tooltip = d3
-    .select("#chart-container")
+    .select(`#${id}`)
     .append("div")
     .style("opacity", 0)
     .attr(
@@ -387,8 +385,15 @@ function setupFirewallChart(raw_data, ip) {
     });
   };
 
-  setInterval(() => {
-    console.log("Live updates:", liveUpdates);
+  const updateInterval = setInterval(() => {
+    if (!document.getElementById(id)) {
+      console.log(`Dropping ws for ${id}`);
+      ws.close();
+      clearInterval(updateInterval);
+      return;
+    }
+
+    console.log(`Live updates for ${id}:`, liveUpdates);
     if (liveUpdates.length === 0) return;
 
     data.push(...liveUpdates);

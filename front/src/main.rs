@@ -7,6 +7,7 @@ use front_components::*;
 use ips::Ip;
 use log::info;
 use maud::{html, Markup};
+use rand::SeedableRng;
 use std::{ops::Deref, sync::Arc};
 use surrealdb::engine::local::{Db, RocksDb};
 use surrealdb::Surreal;
@@ -37,6 +38,7 @@ struct AppState {
 struct InnerState {
     selected_ip: RwLock<Option<Ip>>,
     db: Surreal<Db>,
+    rng: Arc<tokio::sync::Mutex<rand::rngs::StdRng>>,
 }
 
 #[allow(clippy::let_and_return, unused_mut)]
@@ -65,6 +67,7 @@ async fn main() {
     let state = AppState {
         inner: Arc::new(InnerState {
             selected_ip: RwLock::new(selected_ip),
+            rng: Arc::new(tokio::sync::Mutex::new(rand::rngs::StdRng::from_entropy())),
             db,
         }),
     };

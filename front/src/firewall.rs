@@ -74,7 +74,11 @@ async fn rule(
         .await
 }
 
-async fn rules(templ: Template, Selected(Ip { socket: ip, .. }): Selected) -> Markup {
+async fn rules(
+    templ: Template,
+    State(s): State<AppState>,
+    Selected(Ip { socket: ip, .. }): Selected,
+) -> Markup {
     let res = reqwest::get(format!("http://{ip}/firewall/rules"))
         .await
         .unwrap();
@@ -94,6 +98,10 @@ async fn rules(templ: Template, Selected(Ip { socket: ip, .. }): Selected) -> Ma
         .unwrap()
         .replace("\"", "'");
 
+    let mut rng = s.rng.lock().await;
+    let id = rng.next_u64();
+    let id = format!("s{id:0>21}");
+
     // let events: Vec<StoredEventDecoded> = serde_json::from_str(&events).unwrap();
     // log::info!("Got {}", events.len());
 
@@ -102,11 +110,11 @@ async fn rules(templ: Template, Selected(Ip { socket: ip, .. }): Selected) -> Ma
 
         p { "Status: " span hx-get={"http://" (ip) "/firewall/state"} hx-trigger="load, every 30s" {} }
 
-        div #chart-container .w-full {}
+        div #(id) .w-full {}
 
         script { (PreEscaped(include_str!("./firewall_events.js"))) }
         div x-data=(PreEscaped(format!(r#"{{ raw_data: {}, ip: '{}' }}"#, events, ip)))
-            x-init="setupFirewallChart(raw_data, ip)"
+            x-init=(PreEscaped(format!("setupFirewallChart(raw_data, ip, '{}')", id)))
         {}
 
         table .table-auto .text-left .border-separate {
