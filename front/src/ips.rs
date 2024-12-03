@@ -231,8 +231,8 @@ async fn ips_home(templ: Template, State(state): State<AppState>) -> Markup {
                                 td .pl-8 { code { (ip.id.id) } }
                                 td .pl-8 { (ip.name) }
                                 td .pl-8 { (ip.description) }
-                                td .pl-8 { (ip.socket) }
-                                td .pl-8 { (ip.selected) }
+                                td .pl-8 { code { (ip.socket) } }
+                                td .pl-8 { @if ip.selected { "✓" } }
                                 td .pl-8 .space-x-5 {
                                     button
                                         .text-sm
