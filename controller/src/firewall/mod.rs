@@ -129,7 +129,10 @@ pub async fn event_dispatcher(mut socket: WebSocket) {
             ))
             .await
         {
-            panic!("WebSocket send error: {}", e);
+            match e.to_string() {
+                s if s.contains("Broken pipe") => break,
+                _ => panic!("WebSocket send error: {}", e),
+            }
         }
     }
 }
