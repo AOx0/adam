@@ -363,8 +363,8 @@ async fn emit_to_suscriber(
             match SinkExt::send(&mut s, event).await {
                 Ok(_) => continue,
                 Err(e) => match *e {
-                    bincode::ErrorKind::Io(ref e) if e.kind() == ErrorKind::UnexpectedEof => {
-                        log::info!("Channel closed normally (EOF)");
+                    bincode::ErrorKind::Io(ref e) if e.kind() == ErrorKind::UnexpectedEof || e.kind() == ErrorKind::BrokenPipe => {
+                        log::info!("Channel closed normally (EOF/broken pipe)");
                         break;
                     }
                     _ => {
