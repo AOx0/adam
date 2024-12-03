@@ -91,7 +91,8 @@ async fn rules(templ: Template, Selected(Ip { socket: ip, .. }): Selected) -> Ma
         .unwrap()
         .text()
         .await
-        .unwrap();
+        .unwrap()
+        .replace("\"", "'");
 
     // let events: Vec<StoredEventDecoded> = serde_json::from_str(&events).unwrap();
     // log::info!("Got {}", events.len());
@@ -101,14 +102,12 @@ async fn rules(templ: Template, Selected(Ip { socket: ip, .. }): Selected) -> Ma
 
         p { "Status: " span hx-get={"http://" (ip) "/firewall/state"} hx-trigger="load, every 30s" {} }
 
-        script src="https://d3js.org/d3.v6.min.js" {}
         div #chart-container .w-full {}
 
-        script {
-            (PreEscaped(format!("const raw_data = {events};")))
-            (PreEscaped(format!("const ip = '{ip}';")))
-            (PreEscaped(include_str!("./firewall_events.js")))
-        }
+        script { (PreEscaped(include_str!("./firewall_events.js"))) }
+        div x-data=(PreEscaped(format!(r#"{{ raw_data: {}, ip: '{}' }}"#, events, ip)))
+            x-init="setupFirewallChart(raw_data, ip)"
+        {}
 
         table .table-auto .text-left .border-separate {
             thead {
