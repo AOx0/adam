@@ -118,6 +118,13 @@ async fn rules(
         .unwrap()
         .replace("\"", "'");
 
+    let events_decoded: Vec<firewall_common::StoredEventDecoded> =
+        serde_json::from_str(&events.replace("'", "\"")).unwrap();
+    let first_time = events_decoded
+        .first()
+        .map(|e| e.time)
+        .unwrap_or(chrono::Local::now().naive_local());
+
     let mut rng = s.rng.lock().await;
     let id = rng.next_u64();
     let id = format!("s{id:0>21}");
@@ -129,6 +136,15 @@ async fn rules(
         h1 .text-xl .font-bold { "Firewall" }
 
         p { "Status: " span hx-get={"http://" (ip) "/firewall/state"} hx-trigger="load, every 30s" {} }
+
+        div .mb-5 .text-foreground .bg-background ."dark:[color-scheme:dark]" {
+            label for="calendar" { "Since: " }
+            input type="date"
+                name="calendar"
+                id="calendar"
+                value=(first_time.date().to_string())
+                onchange={"window.location.href = '/firewall/rules' + '?since_date=' + this.value"};
+        }
 
         div #(id) .w-full {}
 

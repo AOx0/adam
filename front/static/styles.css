@@ -1186,4 +1186,8 @@ video {
   --tw-text-opacity: 1;
   color: rgb(248 113 113 / var(--tw-text-opacity));
 }
+
+.dark\:\[color-scheme\:dark\]:is(.dark *) {
+  color-scheme: dark;
+}
   
