@@ -731,8 +731,9 @@ video {
   height: 1.5rem;
 }
 
-.h-\[65px\] {
-  height: 65px;
+.h-fit {
+  height: -moz-fit-content;
+  height: fit-content;
 }
 
 .min-h-screen {
@@ -1185,5 +1186,11 @@ video {
 
 .dark\:\[color-scheme\:dark\]:is(.dark *) {
   color-scheme: dark;
+}
+
+@media (min-width: 640px) {
+  .sm\:flex-row {
+    flex-direction: row;
+  }
 }
   

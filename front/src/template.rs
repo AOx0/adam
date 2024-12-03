@@ -182,12 +182,13 @@ async fn Template(
             {
                 nav
                     .sticky."top-0"."z-50".w-full
-                    .flex.flex-row.justify-between.items-center
+                    .flex.justify-between.items-center
+                    .flex-col."sm:flex-row"
                     ."px-6"."py-4"
                     ."border-b"."border-zinc-100/95"."dark:border-zinc-800/95"
                     .backdrop-blur
                     ."supports-[backdrop-filter]:bg-background/60"
-                    ."h-[65px]"
+                    .h-fit
                 {
                     div.flex.flex-row.items-center."space-x-9" {
 

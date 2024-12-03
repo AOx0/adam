@@ -157,7 +157,7 @@ async fn rules(
             x-init=(PreEscaped(format!("setupFirewallChart(raw_data, ip, '{}')", id)))
         {}
 
-        table .table-auto .text-left .border-separate {
+        table .table-auto .text-left .border-separate .w-full {
             thead {
                 tr {
                     th .pl-8 { "ID" }
