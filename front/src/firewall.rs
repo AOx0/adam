@@ -158,9 +158,14 @@ async fn rules(
 
         div #(id) .w-full {}
 
-        script #firewall-script async { (PreEscaped(include_str!("./firewall_events.js"))) }
-        div x-data=(PreEscaped(format!(r#"{{ raw_data: {}, ip: '{}' }}"#, events, ip)))
-            x-init=(PreEscaped(format!("document.getElementById('firewall-script').onload = () => setupFirewallChart(raw_data, ip, '{}')", id)))
+        div x-data=(PreEscaped(format!(r#"{{
+            raw_data: {},
+            ip: '{}',
+            setupFirewallChart(raw_data, ip, id) {{
+                {}
+            }}
+        }}"#, events, ip, include_str!("./firewall_events.js").replace("\"", "'").replace("\n", ""))))
+            x-init=(PreEscaped(format!("setupFirewallChart(raw_data, ip, '{}')", id)))
         {}
 
         table .table-auto .text-left .border-separate .w-full {

@@ -359,7 +359,6 @@ async fn emit_to_suscriber(
     loop {
         select! {
         Ok(event) = erx.recv() => {
-            log::info!("Relaying event");
             match SinkExt::send(&mut s, event).await {
                 Ok(_) => continue,
                 Err(e) => match *e {

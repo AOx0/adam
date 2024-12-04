@@ -194,12 +194,12 @@ async fn ips_home(templ: Template, State(state): State<AppState>) -> Markup {
                 table .table-auto .text-left .border-separate .w-full {
                     thead {
                         tr {
-                            th .pl-8 { "ID" }
-                            th .pl-8 { "Name" }
-                            th .pl-8 { "Description" }
-                            th .pl-8 { "Socket Addr" }
-                            th .pl-8 { "Selected" }
-                            th .pl-8 { "Action" }
+                            th .pl-8 .w-fill { "ID" }
+                            th .pl-8 .w-fill { "Name" }
+                            th .pl-8 .w-fill { "Description" }
+                            th .pl-8 .w-fill { "Socket Addr" }
+                            th .pl-8 .w-fill { "Selected" }
+                            th .pl-8 .w-fill { "Action" }
                         }
                     }
                     tbody {

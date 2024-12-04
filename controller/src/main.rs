@@ -61,8 +61,7 @@ async fn main() {
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
-        .allow_headers(Any)
-        .allow_private_network(true);
+        .allow_headers(Any);
 
     let router = Router::new()
         .nest("/firewall", firewall::router())
