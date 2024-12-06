@@ -1,0 +1,217 @@
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+
+\lstdefinestyle{mystyle}{
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\title{ADAM API Reference}
+\author{AOx0}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This document provides detailed information about ADAM's API endpoints, interfaces, and integration points.
+
+\section{REST API Endpoints}
+
+\subsection{Firewall Management}
+\subsubsection{GET /api/v1/rules}
+Retrieves all current firewall rules.
+
+\begin{lstlisting}[language=json]
+// Request
+GET /api/v1/rules
+
+// Response
+{
+    "rules": [
+        {
+            "id": "rule1",
+            "action": "allow",
+            "source_ip": "192.168.1.0/24",
+            "destination_port": 80,
+            "protocol": "tcp"
+        }
+    ]
+}
+\end{lstlisting}
+
+\subsubsection{POST /api/v1/rules}
+Creates a new firewall rule.
+
+\begin{lstlisting}[language=json]
+// Request
+POST /api/v1/rules
+{
+    "action": "deny",
+    "source_ip": "10.0.0.0/8",
+    "destination_port": 443,
+    "protocol": "tcp"
+}
+
+// Response
+{
+    "id": "rule2",
+    "status": "created"
+}
+\end{lstlisting}
+
+\subsection{Network Analysis}
+\subsubsection{GET /api/v1/traffic}
+Retrieves current traffic statistics.
+
+\begin{lstlisting}[language=json]
+// Request
+GET /api/v1/traffic
+
+// Response
+{
+    "bytes_in": 1024000,
+    "bytes_out": 512000,
+    "packets_in": 1000,
+    "packets_out": 500,
+    "active_connections": 50
+}
+\end{lstlisting}
+
+\section{WebSocket API}
+
+\subsection{Real-time Events}
+\subsubsection{/ws/v1/events}
+Subscribes to real-time system events.
+
+\begin{lstlisting}[language=json]
+// Connection
+ws://localhost:8080/ws/v1/events
+
+// Event Types
+{
+    "type": "rule_match",
+    "data": {
+        "rule_id": "rule1",
+        "timestamp": "2024-01-10T12:00:00Z",
+        "details": {
+            "source_ip": "192.168.1.100",
+            "destination_port": 80
+        }
+    }
+}
+\end{lstlisting}
+
+\section{Command Line Interface}
+
+\subsection{Rule Management}
+\begin{lstlisting}[language=bash]
+# List all rules
+adam rules list
+
+# Add a new rule
+adam rules add --action allow --source 192.168.1.0/24 --port 80
+
+# Delete a rule
+adam rules delete rule1
+\end{lstlisting}
+
+\subsection{Traffic Analysis}
+\begin{lstlisting}[language=bash]
+# Show traffic statistics
+adam traffic show
+
+# Start packet capture
+adam capture start --interface eth0 --filter "port 80"
+
+# Export traffic report
+adam traffic export --format json --output report.json
+\end{lstlisting}
+
+\section{Integration Examples}
+
+\subsection{Python Client}
+\begin{lstlisting}[language=python]
+import adam_client
+
+# Initialize client
+client = adam_client.Client("http://localhost:8080")
+
+# Get rules
+rules = client.get_rules()
+
+# Add rule
+new_rule = {
+    "action": "allow",
+    "source_ip": "192.168.1.0/24",
+    "destination_port": 80
+}
+client.add_rule(new_rule)
+\end{lstlisting}
+
+\subsection{Rust Client}
+\begin{lstlisting}[language=rust]
+use adam_client::Client;
+
+# Initialize client
+let client = Client::new("http://localhost:8080");
+
+# Get rules
+let rules = client.get_rules().await?;
+
+# Add rule
+let new_rule = Rule {
+    action: Action::Allow,
+    source_ip: "192.168.1.0/24".parse()?,
+    destination_port: 80,
+};
+client.add_rule(new_rule).await?;
+\end{lstlisting}
+
+\section{Error Handling}
+
+\subsection{HTTP Status Codes}
+\begin{itemize}
+    \item 200 - Success
+    \item 400 - Bad Request
+    \item 401 - Unauthorized
+    \item 403 - Forbidden
+    \item 404 - Not Found
+    \item 500 - Internal Server Error
+\end{itemize}
+
+\subsection{Error Response Format}
+\begin{lstlisting}[language=json]
+{
+    "error": {
+        "code": "INVALID_RULE",
+        "message": "Invalid rule format",
+        "details": {
+            "field": "source_ip",
+            "reason": "Invalid CIDR notation"
+        }
+    }
+}
+\end{lstlisting}
+
+\end{document} 
