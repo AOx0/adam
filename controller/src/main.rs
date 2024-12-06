@@ -10,6 +10,7 @@ use deadpool::managed::Pool;
 use log::info;
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
+use axum_login::AuthLayer;
 
 mod firewall;
 mod htmx;
@@ -68,6 +69,7 @@ async fn main() {
         .nest("/firewall", firewall::router())
         .layer(axum::middleware::from_fn(insert_headers))
         .layer(cors)
+        .layer(AuthLayer::new())
         .with_state(state);
 
     let listener = TcpListener::bind(socket).await.unwrap();
