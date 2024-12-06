@@ -1,0 +1,262 @@
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{enumitem}
+
+\definecolor{yamlkey}{RGB}{0,0,255}
+\definecolor{yamlvalue}{RGB}{128,0,0}
+\definecolor{yamlcomment}{RGB}{0,128,0}
+
+\lstdefinelanguage{yaml}{
+  keywords={name,on,env,jobs,runs-on,steps,uses,run,with,if},
+  keywordstyle=\color{yamlkey},
+  sensitive=false,
+  comment=[l]{\#},
+  commentstyle=\color{yamlcomment},
+  stringstyle=\color{yamlvalue},
+  morestring=[b]",
+  morestring=[b]',
+}
+
+\title{ADAM GitHub Actions Guide}
+\author{AOx0}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This guide details the GitHub Actions workflows used in the ADAM project, focusing on automation, continuous integration, and deployment processes.
+
+\section{Workflow Structure}
+
+\subsection{Main Workflow}
+\begin{lstlisting}[language=yaml]
+name: Cargo Build & Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  release:
+    types: [created]
+  workflow_dispatch:
+\end{lstlisting}
+
+\subsection{Environment Variables}
+\begin{lstlisting}[language=yaml]
+env:
+  CARGO_TERM_COLOR: always
+\end{lstlisting}
+
+\section{Jobs}
+
+\subsection{Build and Test Job}
+\begin{itemize}
+    \item Name: \texttt{build\_and\_test}
+    \item Runner: Ubuntu Latest
+    \item Purpose: Build and test the project
+\end{itemize}
+
+\subsubsection{Step Sequence}
+\begin{enumerate}[label=\arabic*.]
+    \item Checkout code:
+    \begin{lstlisting}[language=yaml]
+    - uses: actions/checkout@v4
+    \end{lstlisting}
+
+    \item Install LLD linker:
+    \begin{lstlisting}[language=yaml]
+    - name: Install lld
+      run: sudo apt-get install -y lld
+    \end{lstlisting}
+
+    \item Setup Rust toolchain:
+    \begin{lstlisting}[language=yaml]
+    - name: Setup Stable Rust
+      run: |
+        rustup update stable && rustup default stable
+    \end{lstlisting}
+
+    \item Install Tailwind CSS:
+    \begin{lstlisting}[language=yaml]
+    - name: Install Tailwind CSS
+      run: |
+        wget -q https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.15/tailwindcss-linux-x64 -O /usr/local/bin/tailwindcss
+        chmod +x /usr/local/bin/tailwindcss
+    \end{lstlisting}
+\end{enumerate}
+
+\subsection{Tool Installation}
+\begin{enumerate}[label=\arabic*.]
+    \item Just:
+    \begin{lstlisting}[language=yaml]
+    - name: Install just
+      uses: baptiste0928/cargo-install@v3
+      with:
+        crate: just
+    \end{lstlisting}
+
+    \item BPF Linker:
+    \begin{lstlisting}[language=yaml]
+    - name: Install bpf-linker
+      uses: baptiste0928/cargo-install@v3
+      with:
+        crate: bpf-linker
+    \end{lstlisting}
+
+    \item Cargo Nextest:
+    \begin{lstlisting}[language=yaml]
+    - name: Install cargo-nextest
+      uses: baptiste0928/cargo-install@v3
+      with:
+        crate: cargo-nextest
+    \end{lstlisting}
+\end{enumerate}
+
+\section{Binary Production}
+
+\subsection{Production Job}
+\begin{itemize}
+    \item Name: \texttt{produce\_binaries}
+    \item Trigger conditions:
+    \begin{itemize}
+        \item Release creation
+        \item Manual workflow dispatch
+    \end{itemize}
+\end{itemize}
+
+\subsection{Build Steps}
+\begin{lstlisting}[language=yaml]
+- run: just build --release
+- name: Prepare Binaries for Release
+  run: |
+    mkdir -p target/release/binaries
+    for bin in $(cargo run --bin 2>&1 | grep '    ' | 
+                sed -r 's/^\s+//' | grep -v xtask ); do
+      cp "./target/release/$bin" "./target/release/binaries/"
+    done
+\end{lstlisting}
+
+\section{Release Process}
+
+\subsection{GitHub Release Creation}
+\begin{lstlisting}[language=yaml]
+- name: Create GitHub Release
+  uses: softprops/action-gh-release@v1
+  with:
+    files: target/release/binaries/*
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+\end{lstlisting}
+
+\section{Workflow Optimization}
+
+\subsection{Caching Strategies}
+\begin{itemize}
+    \item Rust toolchain caching
+    \item Cargo dependencies caching
+    \item Build artifacts caching
+\end{itemize}
+
+\subsection{Performance Tips}
+\begin{itemize}
+    \item Use specific versions for actions
+    \item Minimize unnecessary steps
+    \item Optimize build flags
+    \item Use appropriate runners
+\end{itemize}
+
+\section{Action Versions}
+
+\subsection{Current Actions}
+\begin{itemize}
+    \item \texttt{actions/checkout@v4}
+    \item \texttt{baptiste0928/cargo-install@v3}
+    \item \texttt{softprops/action-gh-release@v1}
+\end{itemize}
+
+\subsection{Version Management}
+\begin{itemize}
+    \item Regular updates
+    \item Security patches
+    \item Compatibility checks
+    \item Changelog monitoring
+\end{itemize}
+
+\section{Environment Setup}
+
+\subsection{Runner Configuration}
+\begin{itemize}
+    \item Ubuntu Latest environment
+    \item System dependencies
+    \item Environment variables
+    \item Workspace setup
+\end{itemize}
+
+\subsection{Tool Versions}
+\begin{itemize}
+    \item Rust toolchain versions
+    \item Tailwind CSS v3.4.15
+    \item Latest cargo tools
+    \item System packages
+\end{itemize}
+
+\section{Security Considerations}
+
+\subsection{Token Management}
+\begin{itemize}
+    \item GitHub token usage
+    \item Secret management
+    \item Permission scoping
+    \item Token rotation
+\end{itemize}
+
+\subsection{Build Security}
+\begin{itemize}
+    \item Dependency verification
+    \item Binary validation
+    \item Source integrity
+    \item Release signing
+\end{itemize}
+
+\section{Troubleshooting}
+
+\subsection{Common Issues}
+\begin{itemize}
+    \item Action failures
+    \item Build errors
+    \item Permission problems
+    \item Network issues
+\end{itemize}
+
+\subsection{Debug Techniques}
+\begin{itemize}
+    \item Enable debug logging
+    \item Check runner logs
+    \item Validate inputs
+    \item Test locally
+\end{itemize}
+
+\section{Best Practices}
+
+\subsection{Workflow Design}
+\begin{itemize}
+    \item Clear job separation
+    \item Conditional execution
+    \item Proper naming
+    \item Documentation
+\end{itemize}
+
+\subsection{Maintenance}
+\begin{itemize}
+    \item Regular updates
+    \item Version tracking
+    \item Performance monitoring
+    \item Security audits
+\end{itemize}
+
+\end{document} 
