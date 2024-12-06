@@ -56,3 +56,7 @@ To run the frontend perform a:
 ```sh
 just run-front-watch
 ```
+
+## Documentation
+
+For detailed instructions on how to run the code, please refer to the [Latex documentation](docs/usage_guide.tex).

@@ -1,0 +1,76 @@
+\documentclass{article}
+\usepackage{hyperref}
+
+\title{Troubleshooting Guide for ADAM}
+\author{AOx0}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This document provides troubleshooting instructions for the ADAM project. It includes sections on common issues and their solutions.
+
+\section{Common Issues}
+\subsection{Issue 1: Build Failure}
+\textbf{Description:} The build process fails with an error message.
+
+\textbf{Solution:}
+\begin{enumerate}
+    \item Ensure all dependencies are installed as mentioned in the prerequisites section of the usage guide.
+    \item Check the error message for specific details and address the issue accordingly.
+    \item Clean the build directory and try building again:
+    \begin{verbatim}
+    cargo clean
+    cargo build
+    \end{verbatim}
+\end{enumerate}
+
+\subsection{Issue 2: Runtime Error}
+\textbf{Description:} The application crashes or behaves unexpectedly during runtime.
+
+\textbf{Solution:}
+\begin{enumerate}
+    \item Check the log files for error messages and stack traces.
+    \item Ensure all environment variables are set correctly.
+    \item Verify that the correct version of dependencies is installed.
+    \item Run the application in debug mode to get more detailed error messages:
+    \begin{verbatim}
+    cargo run
+    \end{verbatim}
+\end{enumerate}
+
+\subsection{Issue 3: Network Connectivity Problems}
+\textbf{Description:} The application is unable to connect to the network or other services.
+
+\textbf{Solution:}
+\begin{enumerate}
+    \item Check the network configuration and ensure the network interface is up and running.
+    \item Verify that the firewall settings are not blocking the required ports.
+    \item Ensure the correct IP address and port are specified in the configuration files.
+    \item Use network diagnostic tools like \texttt{ping} and \texttt{traceroute} to identify connectivity issues.
+\end{enumerate}
+
+\section{Troubleshooting Steps}
+\subsection{Step 1: Identify the Issue}
+\begin{enumerate}
+    \item Review the error messages and logs to identify the root cause of the issue.
+    \item Check the system resources (CPU, memory, disk space) to ensure they are not exhausted.
+    \item Verify that all required services are running.
+\end{enumerate}
+
+\subsection{Step 2: Apply Solutions}
+\begin{enumerate}
+    \item Follow the solutions provided in the common issues section.
+    \item If the issue persists, search for similar issues in the project's issue tracker or forums.
+    \item Consult the project's documentation for additional troubleshooting steps.
+\end{enumerate}
+
+\subsection{Step 3: Seek Help}
+\begin{enumerate}
+    \item If you are unable to resolve the issue, seek help from the project's community or support channels.
+    \item Provide detailed information about the issue, including error messages, logs, and steps to reproduce the problem.
+\end{enumerate}
+
+\end{document}
