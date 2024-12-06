@@ -1,0 +1,273 @@
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{enumitem}
+
+\definecolor{rustcomment}{RGB}{0,128,0}
+\definecolor{ruststring}{RGB}{128,0,0}
+\definecolor{rustkeyword}{RGB}{0,0,255}
+
+\lstdefinelanguage{rust}{
+  keywords={
+    use,mod,pub,struct,enum,fn,let,mut,async,await,impl
+  },
+  keywordstyle=\color{rustkeyword},
+  sensitive=true,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  commentstyle=\color{rustcomment},
+  stringstyle=\color{ruststring},
+  morestring=[b]",
+  morestring=[b]',
+}
+
+\title{ADAM Frontend Guide}
+\author{AOx0}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This guide details the frontend architecture of the ADAM project, focusing on the web interface implementation using Rust, Tailwind CSS, and modern web technologies.
+
+\section{Technology Stack}
+
+\subsection{Core Technologies}
+\begin{itemize}
+    \item Axum - Web framework
+    \item Maud - Rust templating engine
+    \item Alpine.js - JavaScript framework
+    \item HTMX - Dynamic HTML updates
+    \item Tailwind CSS - Styling framework
+\end{itemize}
+
+\section{Theme System}
+
+\subsection{Color Scheme}
+The frontend implements a comprehensive theming system with support for light and dark modes:
+
+\begin{lstlisting}[language=css]
+:root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --primary: 240 5.9% 10%;
+    --secondary: 240 4.8% 95.9%;
+    --destructive: 0 72.22% 50.59%;
+    --border: 240 5.9% 90%;
+}
+
+.dark {
+    --background: 0 0% 9.4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --primary: 0 0% 98%;
+    --secondary: 240 3.7% 15.9%;
+}
+\end{lstlisting}
+
+\section{Component Architecture}
+
+\subsection{Firewall Interface}
+The firewall interface includes several key components:
+
+\begin{lstlisting}[language=rust]
+pub fn FirewallStatus(enabled: bool, ip: SocketAddr) -> Markup {
+    Status(enabled, &format!("http://{ip}/firewall/state/toggle"))
+}
+
+pub fn FirewallLog(ip: SocketAddr) -> Markup {
+    html! {
+        script {
+            // WebSocket connection for real-time events
+            const ws = new WebSocket('ws://{ip}/firewall/events/ws');
+            ws.onmessage = (event) => {
+                const logDiv = document.getElementById('{id}');
+                const newEvent = document.createElement('p');
+                newEvent.textContent = event.data;
+                logDiv.appendChild(newEvent);
+            };
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{Navigation}
+The main navigation structure:
+
+\begin{lstlisting}[language=html]
+nav.sticky.top-0.z-50.w-full {
+    div.flex.flex-row.items-center {
+        h1.font-semibold { "ADAM" }
+        // Theme toggle button
+        button x-on:click="isDark = toggleDarkMode()" {
+            div.dark:hidden.block {
+                // Sun icon
+            }
+            div.hidden.dark:block {
+                // Moon icon
+            }
+        }
+    }
+}
+\end{lstlisting}
+
+\section{Layout System}
+
+\subsection{Grid Layout}
+The main content layout uses a flexible grid system:
+
+\begin{lstlisting}[language=html]
+div.flex style="gap: 2rem" {
+    // Left column - 25% width
+    div.flex-col style="width: 25%" {
+        // Tools box
+        div.rounded {
+            h2.text-white { "Your tools / data" }
+        }
+        // Environment box
+        div.rounded {
+            h2.text-white { "Your environment" }
+        }
+    }
+}
+\end{lstlisting}
+
+\section{Interactive Components}
+
+\subsection{Rule Management}
+The rule management interface includes:
+
+\begin{lstlisting}[language=html]
+table.table-auto.text-left {
+    thead {
+        tr {
+            th { "ID" }
+            th { "Name" }
+            th { "Description" }
+            th { "Status" }
+            th { "Action" }
+        }
+    }
+    tbody {
+        // Dynamic rule entries
+    }
+}
+\end{lstlisting}
+
+\subsection{IP Management}
+IP address management interface:
+
+\begin{lstlisting}[language=html]
+div x-data="{ open: false }" {
+    button.bg-foreground.text-background {
+        "Add IP"
+    }
+    table.table-auto {
+        // IP entries and form
+    }
+}
+\end{lstlisting}
+
+\section{Styling System}
+
+\subsection{Utility Classes}
+Common utility classes used throughout the application:
+
+\begin{itemize}
+    \item Layout: \texttt{flex}, \texttt{grid}, \texttt{w-full}
+    \item Spacing: \texttt{p-4}, \texttt{m-2}, \texttt{gap-4}
+    \item Typography: \texttt{text-sm}, \texttt{font-bold}
+    \item Colors: \texttt{bg-background}, \texttt{text-foreground}
+\end{itemize}
+
+\subsection{Custom Components}
+Component-specific styling:
+
+\begin{lstlisting}[language=css]
+.status-button {
+    @apply bg-foreground/30 
+           border-foreground 
+           text-foreground 
+           border 
+           rounded-full 
+           px-2 
+           text-sm;
+}
+\end{lstlisting}
+
+\section{Build Process}
+
+\subsection{Frontend Build}
+The frontend build process includes:
+
+\begin{verbatim}
+# Build frontend
+build-front flags='': build-tailwind
+    cd ./front/ && cargo build $@
+
+# Build Tailwind CSS
+build-tailwind:
+    tailwindcss -i ./front/static/input.css 
+                -o ./front/static/styles.css 
+                -c ./tailwind.config.js
+\end{verbatim}
+
+\section{Real-time Features}
+
+\subsection{WebSocket Integration}
+Implementation of real-time updates:
+
+\begin{lstlisting}[language=javascript]
+const ws = new WebSocket('ws://{ip}/firewall/events/ws');
+ws.onmessage = (event) => {
+    const logDiv = document.getElementById('{id}');
+    const newEvent = document.createElement('p');
+    newEvent.textContent = event.data;
+    logDiv.appendChild(newEvent);
+};
+\end{lstlisting}
+
+\section{Accessibility}
+
+\subsection{Color Contrast}
+Color system ensures proper contrast ratios:
+\begin{itemize}
+    \item Light mode: Background (100\% white) vs Foreground (3.9\% black)
+    \item Dark mode: Background (9.4\% black) vs Foreground (98\% white)
+\end{itemize}
+
+\subsection{Responsive Design}
+Responsive design features:
+\begin{itemize}
+    \item Flexible layouts using Flexbox and Grid
+    \item Mobile-first approach with breakpoint utilities
+    \item Adaptive typography and spacing
+\end{itemize}
+
+\section{Performance Optimization}
+
+\subsection{Asset Optimization}
+Performance considerations:
+\begin{itemize}
+    \item Tailwind CSS purging unused styles
+    \item Minimal JavaScript with Alpine.js
+    \item Efficient WebSocket communication
+    \item Server-side rendering with Maud
+\end{itemize}
+
+\section{Development Workflow}
+
+\subsection{Local Development}
+Development process:
+\begin{itemize}
+    \item Hot reloading with \texttt{cargo-watch}
+    \item Tailwind CSS watching for changes
+    \item Browser sync capabilities
+    \item Development tools integration
+\end{itemize}
+
+\end{document} 
