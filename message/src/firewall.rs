@@ -13,6 +13,7 @@ pub enum Response {
     Status(Status),
     RuleChange(RuleChange),
     Events(Vec<firewall_common::StoredEventDecoded>),
+    UpdateRule(firewall_common::StoredRuleDecoded),
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -60,4 +61,5 @@ pub enum Request {
     GetRules,
     Status,
     GetEvents(crate::EventQuery),
+    UpdateRule(u32, firewall_common::StoredRuleDecoded),
 }
