@@ -1,0 +1,190 @@
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{yamlkey}{RGB}{0,0,255}
+\definecolor{yamlvalue}{RGB}{128,0,0}
+\definecolor{yamlcomment}{RGB}{0,128,0}
+
+\lstdefinelanguage{yaml}{
+  keywords={name,on,env,jobs,runs-on,steps,uses,run,with,if},
+  keywordstyle=\color{yamlkey},
+  sensitive=false,
+  comment=[l]{\#},
+  commentstyle=\color{yamlcomment},
+  stringstyle=\color{yamlvalue},
+  morestring=[b]",
+  morestring=[b]',
+}
+
+\title{ADAM Continuous Integration Guide}
+\author{AOx0}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This guide describes the continuous integration (CI) process for the ADAM project, implemented using GitHub Actions.
+
+\section{CI/CD Pipeline Overview}
+
+\subsection{Trigger Events}
+The CI pipeline is triggered by:
+\begin{itemize}
+    \item Push to main branch
+    \item Pull requests
+    \item Release creation
+    \item Manual workflow dispatch
+\end{itemize}
+
+\section{Build and Test Job}
+
+\subsection{Environment}
+\begin{itemize}
+    \item Ubuntu Latest
+    \item Rust toolchain (stable and nightly)
+    \item Required dependencies:
+    \begin{itemize}
+        \item lld linker
+        \item Tailwind CSS
+        \item just
+        \item bpf-linker
+        \item cargo-nextest
+    \end{itemize}
+\end{itemize}
+
+\subsection{Setup Steps}
+\begin{lstlisting}[language=yaml]
+steps:
+  - uses: actions/checkout@v4
+  - name: Install lld
+    run: sudo apt-get install -y lld
+  - name: Setup Stable Rust
+    run: |
+      rustup update stable && rustup default stable
+\end{lstlisting}
+
+\subsection{Tool Installation}
+\begin{verbatim}
+# Install Tailwind CSS
+wget -q https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.15/tailwindcss-linux-x64 -O /usr/local/bin/tailwindcss
+chmod +x /usr/local/bin/tailwindcss
+
+# Install Rust tools
+cargo install just
+cargo install bpf-linker
+cargo install cargo-nextest
+\end{verbatim}
+
+\section{Build Process}
+
+\subsection{Rust Setup}
+\begin{verbatim}
+# Setup Nightly Rust
+rustup update nightly && rustup default nightly
+rustup component add rustc-codegen-cranelift-preview --toolchain nightly
+\end{verbatim}
+
+\subsection{Build Steps}
+\begin{enumerate}
+    \item Build firewall component:
+    \begin{verbatim}
+    just build-firewall
+    \end{verbatim}
+    \item Run test suite:
+    \begin{verbatim}
+    cargo nextest run
+    \end{verbatim}
+\end{enumerate}
+
+\section{Binary Production}
+
+\subsection{Trigger Conditions}
+Binary production is triggered on:
+\begin{itemize}
+    \item Release creation
+    \item Manual workflow dispatch
+\end{itemize}
+
+\subsection{Build Process}
+\begin{lstlisting}[language=yaml]
+- run: just build --release
+- name: Prepare Binaries for Release
+  run: |
+    mkdir -p target/release/binaries
+    for bin in $(cargo run --bin 2>&1 | grep '    ' | 
+                sed -r 's/^\s+//' | grep -v xtask ); do
+      cp "./target/release/$bin" "./target/release/binaries/"
+    done
+\end{lstlisting}
+
+\section{Release Process}
+
+\subsection{GitHub Release Creation}
+\begin{lstlisting}[language=yaml]
+- name: Create GitHub Release
+  uses: softprops/action-gh-release@v1
+  with:
+    files: target/release/binaries/*
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+\end{lstlisting}
+
+\section{Best Practices}
+
+\subsection{CI Pipeline Maintenance}
+\begin{itemize}
+    \item Regular updates of action versions
+    \item Dependency version management
+    \item Security token rotation
+    \item Pipeline performance optimization
+\end{itemize}
+
+\subsection{Quality Gates}
+\begin{itemize}
+    \item All tests must pass
+    \item Build must succeed
+    \item Code coverage requirements
+    \item Security scan results
+\end{itemize}
+
+\section{Troubleshooting}
+
+\subsection{Common Issues}
+\begin{itemize}
+    \item Build failures
+    \item Test failures
+    \item Dependency conflicts
+    \item Permission issues
+\end{itemize}
+
+\subsection{Debug Steps}
+\begin{itemize}
+    \item Check GitHub Actions logs
+    \item Verify environment setup
+    \item Test locally with same configuration
+    \item Review dependency versions
+\end{itemize}
+
+\section{Security Considerations}
+
+\subsection{Secret Management}
+\begin{itemize}
+    \item GitHub Secrets usage
+    \item Token permissions
+    \item Environment variables
+    \item Access control
+\end{itemize}
+
+\subsection{Build Security}
+\begin{itemize}
+    \item Dependency scanning
+    \item Code signing
+    \item Artifact verification
+    \item Release validation
+\end{itemize}
+
+\end{document} 
