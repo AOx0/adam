@@ -43,6 +43,28 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
         core::slice::from_raw_parts_mut(ctx.data() as *mut u8, ctx.data_end() - ctx.data())
     };
 
+    // Check position-based rules first, before any protocol parsing
+    for i in 0..MAX_RULES {
+        let Some(
+            rule @ Rule {
+                init: true,
+                enabled: true,
+                ..
+            },
+        ) = FIREWALL_RULES.get(i)
+        else {
+            continue;
+        };
+
+        if let Match::BytesAtPosition { position, value } = rule.matches {
+            if let Ok(_) = bounds!(ctx, position) {
+                if packet.get(position).copied() == Some(value) {
+                    return emit(ctx, rule.action, None);
+                }
+            }
+        }
+    }
+
     bounds!(ctx, 50).or_pass()?;
     let (eth, rem) = Ethernet::new(packet).or_pass()?;
 
@@ -83,6 +105,12 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
 
             if let Match::Match(core::net::IpAddr::V4(addr)) = rule.matches {
                 if addr.to_bits() == matching_ip {
+                    return emit(ctx, rule.action, Some((i, socket_addr)));
+                }
+            }
+
+            if let Match::BytesAtPosition { position, value } = rule.matches {
+                if rem.get(position).copied() == Some(value) {
                     return emit(ctx, rule.action, Some((i, socket_addr)));
                 }
             }
