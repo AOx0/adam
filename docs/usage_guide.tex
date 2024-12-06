@@ -1,0 +1,150 @@
+\documentclass{article}
+\usepackage{hyperref}
+
+\title{Usage Guide for ADAM}
+\author{AOx0}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This document provides detailed instructions on how to run the ADAM project. It includes sections on prerequisites, dependencies, and running the code.
+
+\section{Prerequisites}
+Before running the code, ensure you have the following prerequisites installed:
+
+\subsection{Cranelift Codegen Backend}
+\begin{verbatim}
+rustup component add rustc-codegen-cranelift-preview --toolchain nightly
+\end{verbatim}
+
+\subsection{Dependencies}
+\begin{enumerate}
+    \item Install \texttt{lld}: \texttt{paru -S lld} or \texttt{sudo apt-get install lld}
+    \item Install \texttt{bpf-linker}: \texttt{cargo install bpf-linker}
+    \item Install \texttt{zellij}: \texttt{cargo install zellij}
+    \item Install \texttt{cargo-watch}: \texttt{cargo install cargo-watch}
+    \item Install \texttt{just}: \texttt{cargo install just}
+    \item Install \texttt{hurl}: \texttt{cargo install hurl}
+\end{enumerate}
+
+You may install all packages via your package manager, for example, for Arch Linux:
+\begin{verbatim}
+paru -S just hurl zellij cargo-watch lld
+cargo install bpf-linker
+\end{verbatim}
+
+\section{Running the Code}
+All recipe definitions are available in the \texttt{justfile}.
+
+\subsection{Running Everything}
+To run all components, execute:
+\begin{verbatim}
+just run
+\end{verbatim}
+
+You may also specify the firewall wifi interface you want to attach to:
+\begin{verbatim}
+just run wlan0
+\end{verbatim}
+
+\subsection{Running Backend}
+To run up to the \texttt{controller}, perform:
+\begin{verbatim}
+just run-simple
+\end{verbatim}
+
+\subsection{Running Frontend}
+To run the frontend, perform:
+\begin{verbatim}
+just run-front-watch
+\end{verbatim}
+
+\section{Firewall Component}
+The firewall component has additional instructions for building and running.
+
+\subsection{Prerequisites}
+Install \texttt{bpf-linker}:
+\begin{verbatim}
+cargo install bpf-linker
+\end{verbatim}
+
+\subsection{Build eBPF}
+\begin{verbatim}
+cargo xtask build-ebpf <NAME>
+\end{verbatim}
+To perform a release build, use the \texttt{--release} flag. You may also change the target architecture with the \texttt{--target} flag.
+
+\subsection{Build Userspace}
+\begin{verbatim}
+cargo build
+\end{verbatim}
+
+\subsection{Build eBPF and Userspace}
+\begin{verbatim}
+cargo xtask build <NAME>
+\end{verbatim}
+
+\subsection{Run}
+\begin{verbatim}
+RUST_LOG=info cargo xtask run <NAME>
+\end{verbatim}
+
+\section{Building the Project}
+To build the entire project, use the following command:
+\begin{verbatim}
+cargo build
+\end{verbatim}
+
+\section{Testing the Project}
+To run tests for the project, use the following command:
+\begin{verbatim}
+cargo test
+\end{verbatim}
+
+\section{Detailed Explanations and Examples}
+\subsection{Example 1: Running the Firewall Component}
+Here is a step-by-step example of running the firewall component:
+\begin{enumerate}
+    \item Install the prerequisites as mentioned in the prerequisites section.
+    \item Build the eBPF component:
+    \begin{verbatim}
+    cargo xtask build-ebpf firewall
+    \end{verbatim}
+    \item Build the userspace component:
+    \begin{verbatim}
+    cargo build
+    \end{verbatim}
+    \item Run the firewall component:
+    \begin{verbatim}
+    RUST_LOG=info cargo xtask run firewall
+    \end{verbatim}
+\end{enumerate}
+
+\subsection{Example 2: Running the Entire Project}
+Here is a step-by-step example of running the entire project:
+\begin{enumerate}
+    \item Install the prerequisites as mentioned in the prerequisites section.
+    \item Run all components:
+    \begin{verbatim}
+    just run
+    \end{verbatim}
+    \item Specify the firewall wifi interface if needed:
+    \begin{verbatim}
+    just run wlan0
+    \end{verbatim}
+\end{enumerate}
+
+\subsection{Example 3: Running the Frontend}
+Here is a step-by-step example of running the frontend:
+\begin{enumerate}
+    \item Install the prerequisites as mentioned in the prerequisites section.
+    \item Run the frontend:
+    \begin{verbatim}
+    just run-front-watch
+    \end{verbatim}
+\end{enumerate}
+
+\end{document}

@@ -1,0 +1,124 @@
+\documentclass{article}
+\usepackage{hyperref}
+
+\title{Advanced Usage Guide for ADAM}
+\author{AOx0}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This document provides advanced usage instructions for the ADAM project. It includes sections on advanced configuration, customization, and examples of advanced usage scenarios.
+
+\section{Advanced Configuration}
+\subsection{Customizing the Firewall Component}
+The firewall component can be customized by modifying the configuration files located in the `firewall/config` directory. Here are some common customizations:
+
+\subsubsection{Changing the Default Rules}
+To change the default rules, edit the `firewall/config/rules.toml` file. For example, to allow traffic from a specific IP address, add the following rule:
+\begin{verbatim}
+[[rules]]
+action = "allow"
+source = "192.168.1.100"
+\end{verbatim}
+
+\subsubsection{Modifying the Logging Level}
+To modify the logging level, edit the `firewall/config/logging.toml` file. For example, to set the logging level to `debug`, change the following line:
+\begin{verbatim}
+level = "debug"
+\end{verbatim}
+
+\subsection{Advanced Network Configuration}
+The ADAM project supports advanced network configurations. Here are some examples:
+
+\subsubsection{Configuring Multiple Network Interfaces}
+To configure multiple network interfaces, edit the `network/interfaces.toml` file. For example, to add a new network interface, add the following section:
+\begin{verbatim}
+[[interfaces]]
+name = "eth1"
+address = "192.168.2.1"
+netmask = "255.255.255.0"
+\end{verbatim}
+
+\subsubsection{Setting Up VLANs}
+To set up VLANs, edit the `network/vlans.toml` file. For example, to create a new VLAN, add the following section:
+\begin{verbatim}
+[[vlans]]
+id = 10
+name = "VLAN10"
+interface = "eth0"
+\end{verbatim}
+
+\section{Advanced Customization}
+\subsection{Customizing the Frontend}
+The frontend can be customized by modifying the files located in the `front` directory. Here are some common customizations:
+
+\subsubsection{Changing the Theme}
+To change the theme, edit the `front/static/styles.css` file. For example, to change the background color, modify the following line:
+\begin{verbatim}
+body {
+    background-color: #f0f0f0;
+}
+\end{verbatim}
+
+\subsubsection{Adding New Pages}
+To add new pages, create a new file in the `front/pages` directory. For example, to add a new page called `about.html`, create the file `front/pages/about.html` and add the following content:
+\begin{verbatim}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>About</title>
+</head>
+<body>
+    <h1>About</h1>
+    <p>This is the about page.</p>
+</body>
+</html>
+\end{verbatim}
+
+\section{Advanced Usage Scenarios}
+\subsection{Scenario 1: Setting Up a VPN}
+Here is a step-by-step example of setting up a VPN using the ADAM project:
+\begin{enumerate}
+    \item Install the prerequisites as mentioned in the prerequisites section of the usage guide.
+    \item Configure the VPN server by editing the `vpn/server.toml` file. For example, to set the server address, modify the following line:
+    \begin{verbatim}
+    address = "10.0.0.1"
+    \end{verbatim}
+    \item Start the VPN server:
+    \begin{verbatim}
+    just run-vpn-server
+    \end{verbatim}
+    \item Configure the VPN client by editing the `vpn/client.toml` file. For example, to set the client address, modify the following line:
+    \begin{verbatim}
+    address = "10.0.0.2"
+    \end{verbatim}
+    \item Start the VPN client:
+    \begin{verbatim}
+    just run-vpn-client
+    \end{verbatim}
+\end{enumerate}
+
+\subsection{Scenario 2: Setting Up a Load Balancer}
+Here is a step-by-step example of setting up a load balancer using the ADAM project:
+\begin{enumerate}
+    \item Install the prerequisites as mentioned in the prerequisites section of the usage guide.
+    \item Configure the load balancer by editing the `load_balancer/config.toml` file. For example, to add backend servers, add the following section:
+    \begin{verbatim}
+    [[backends]]
+    address = "192.168.1.101"
+    port = 80
+
+    [[backends]]
+    address = "192.168.1.102"
+    port = 80
+    \end{verbatim}
+    \item Start the load balancer:
+    \begin{verbatim}
+    just run-load-balancer
+    \end{verbatim}
+\end{enumerate}
+
+\end{document}
