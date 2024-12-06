@@ -1,0 +1,109 @@
+\documentclass{article}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{listings}
+
+\title{ADAM System Architecture}
+\author{AOx0}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This document provides a detailed overview of the ADAM system architecture, its components, and how they interact with each other.
+
+\section{System Components}
+ADAM consists of three main components:
+
+\subsection{Firewall Component}
+The firewall component is responsible for network packet filtering and security. It includes:
+\begin{itemize}
+    \item eBPF-based packet filtering
+    \item Userspace control program
+    \item Rule management system
+\end{itemize}
+
+\subsection{Network Parser (netp)}
+The network parser component provides packet analysis capabilities:
+\begin{itemize}
+    \item Packet capture and analysis
+    \item Protocol parsing
+    \item Traffic monitoring
+\end{itemize}
+
+\subsection{Controller}
+The controller component coordinates the system:
+\begin{itemize}
+    \item Management of firewall rules
+    \item System configuration
+    \item Component coordination
+\end{itemize}
+
+\section{Component Interactions}
+\subsection{Data Flow}
+The data flows through the system as follows:
+\begin{enumerate}
+    \item Network packets are intercepted by the eBPF program
+    \item Packets are analyzed by the network parser
+    \item The controller applies firewall rules based on analysis
+    \item Packets are either allowed or dropped based on rules
+\end{enumerate}
+
+\section{Technical Details}
+\subsection{eBPF Implementation}
+The firewall uses eBPF for efficient packet processing:
+\begin{itemize}
+    \item XDP hooks for early packet processing
+    \item TC (Traffic Control) filters for fine-grained control
+    \item BPF maps for sharing data between kernel and userspace
+\end{itemize}
+
+\subsection{Network Parser Implementation}
+The network parser is implemented with:
+\begin{itemize}
+    \item Zero-copy packet processing
+    \item Protocol-specific parsers
+    \item Efficient memory management
+\end{itemize}
+
+\section{Performance Considerations}
+\subsection{Optimization Techniques}
+The system employs several optimization techniques:
+\begin{itemize}
+    \item Lock-free data structures
+    \item Zero-copy packet processing
+    \item Efficient memory allocation
+    \item Batch processing where applicable
+\end{itemize}
+
+\subsection{Resource Usage}
+Typical resource usage patterns:
+\begin{itemize}
+    \item Memory footprint: 10-50MB depending on configuration
+    \item CPU usage: 1-5% per core under normal load
+    \item Network overhead: Minimal due to eBPF implementation
+\end{itemize}
+
+\section{Security Considerations}
+\subsection{Security Features}
+Built-in security features include:
+\begin{itemize}
+    \item Privilege separation
+    \item Secure communication between components
+    \item Input validation and sanitization
+    \item Rate limiting and DoS protection
+\end{itemize}
+
+\section{Future Considerations}
+Areas for potential future enhancement:
+\begin{itemize}
+    \item Additional protocol support
+    \item Enhanced monitoring capabilities
+    \item Integration with external security tools
+    \item Performance optimizations
+\end{itemize}
+
+\end{document} 
