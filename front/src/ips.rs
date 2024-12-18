@@ -206,11 +206,11 @@ async fn ips_home(templ: Template, State(state): State<AppState>) -> Markup {
                         tr x-show="open" {
                             form method="post" action="/ips/add" x-ref="form" {
                                 td .pl-8 { "-" }
-                                td .pl-8 { input type="text" name="name" .px-1 ."bg-foreground/5" .outline-none {} }
-                                td .pl-8 { input type="text" name="description" .px-1 ."bg-foreground/5" .outline-none {} }
+                                td .pl-8 { input type="text" name="name" .px-1 ."bg-foreground/5" .outline-none required {} }
+                                td .pl-8 { input type="text" name="description" .px-1 ."bg-foreground/5" .outline-none required {} }
                                 td .pl-8 {
-                                    input type="text" name="address" .px-1 .w-32 ."bg-foreground/5" .outline-none {}
-                                    input type="number" name="port" value="9988" .px-1 .w-20 .ml-2 ."bg-foreground/5" .outline-none {}
+                                    input type="text" name="address" .px-1 .w-32 ."bg-foreground/5" .outline-none required {}
+                                    input type="number" name="port" value="9988" .px-1 .w-20 .ml-2 ."bg-foreground/5" .outline-none required {}
                                 }
                                 td .pl-8 { "-" }
                                 td .pl-8 {
