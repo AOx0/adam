@@ -13,12 +13,12 @@ anyhow = "1"
 env_logger = "0.10"
 libc = "0.2"
 log = "0.4"
-tokio = { version = "1.41", features = ["macros", "rt", "rt-multi-thread", "net", "signal", "sync", "time", "fs"] }
+tokio = { version = "1.42", features = ["macros", "rt", "rt-multi-thread", "net", "signal", "sync", "time", "fs"] }
 netp.path = "../netp"
 message = { path = "../message" }
-diesel = { version = "2.2.5", features = ["sqlite", "chrono"] }
+diesel = { version = "2.2.6", features = ["sqlite", "chrono"] }
 libsqlite3-sys = { version = "0.30.1", features = ["bundled"] }
-diesel-async = { version = "0.5.1", features = ["async-connection-wrapper", "sqlite", "sync-connection-wrapper"] }
+diesel-async = { version = "0.5.2", features = ["async-connection-wrapper", "sqlite", "sync-connection-wrapper"] }
 diesel_migrations = { version = "2.2.0", features = ["sqlite"] }
 dotenv = "0.15.0"
 bincode = "*"
