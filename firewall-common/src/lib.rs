@@ -39,6 +39,7 @@ pub enum Match {
     Socket(core::net::SocketAddr),
     Port(u16),
     Protocol(InetProtocol),
+    BytesAtPosition { position: usize, value: u8 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
