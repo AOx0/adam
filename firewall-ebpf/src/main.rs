@@ -43,7 +43,7 @@ fn try_firewall(ctx: XdpContext) -> Result<u32, u32> {
         core::slice::from_raw_parts_mut(ctx.data() as *mut u8, ctx.data_end() - ctx.data())
     };
 
-    bounds!(ctx, 50).or_pass()?;
+    bounds!(ctx, 38).or_pass()?;
     let (eth, rem) = Ethernet::new(packet).or_pass()?;
 
     // TODO: Impl this
@@ -108,7 +108,7 @@ fn try_ipv4_tcp(ctx: XdpContext) -> Result<u32, u32> {
         core::slice::from_raw_parts_mut(ctx.data() as *mut u8, ctx.data_end() - ctx.data())
     };
 
-    bounds!(ctx, 50).or_pass()?;
+    bounds!(ctx, 38).or_pass()?;
     let (eth, rem) = Ethernet::new(packet).or_pass()?;
     let (ip4, rem) = IPv4::new(rem).or_drop()?;
 
