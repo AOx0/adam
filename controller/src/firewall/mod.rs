@@ -65,7 +65,8 @@ pub fn router() -> Router<AppState> {
         .route("/:idx/disable", routing::post(disable))
         .route("/:idx/toggle", routing::post(toggle))
         .route("/:idx", routing::get(get_rule).delete(delete))
-        .route("/", routing::get(get_rules).post(add));
+        .route("/", routing::get(get_rules).post(add))
+        .route("/update/:id", routing::post(update_rule)); // P2f78
 
     Router::new()
         .nest("/rules", rules)
@@ -236,6 +237,16 @@ pub async fn halt(State(s): State<AppState>) {
     s.firewall_pool.get().await.unwrap().halt().await;
 }
 
+pub async fn update_rule(
+    State(s): State<AppState>,
+    Path((id,)): Path<(u32,)>,
+    Json(rule): Json<StoredRuleDecoded>,
+) -> Json<firewall::Response> {
+    let mut socket = s.firewall_pool.get().await.unwrap();
+    socket.update(id, rule).await;
+    Json(socket.read().await)
+}
+
 impl Socket {
     pub async fn new() -> Self {
         let stream: AsyncBincodeStream<UnixStream, firewall::Response, Message, AsyncDestination> =
@@ -353,5 +364,10 @@ impl Socket {
 
     pub async fn term(&mut self) {
         self.send(Message::Terminate).await
+    }
+
+    pub async fn update(&mut self, id: u32, rule: StoredRuleDecoded) {
+        self.send(Message::Firewall(firewall::Request::UpdateRule(id, rule)))
+            .await
     }
 }
